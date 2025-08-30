@@ -40,8 +40,8 @@ export class BatchStack extends cdk.Stack {
               ],
               resources: [
                 `${props.paramsResourceStack.userInfoBucket.bucketArn}/*`,
-                `arn:aws:s3:::${cdk.Fn.importValue('${props.appName}-${props.stage}-post-data-bucket-name')}/*`,
-                `arn:aws:s3:::${cdk.Fn.importValue('${props.appName}-${props.stage}-provenance-bucket-name')}/*`,
+                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`)}/*`,
+                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`)}/*`,
                 `${props.paramsResourceStack.provenancePublicBucket.bucketArn}/*`
               ]
             }),
@@ -52,8 +52,8 @@ export class BatchStack extends cdk.Stack {
               ],
               resources: [
                 props.paramsResourceStack.userInfoBucket.bucketArn,
-                `arn:aws:s3:::${cdk.Fn.importValue('${props.appName}-${props.stage}-post-data-bucket-name')}`,
-                `arn:aws:s3:::${cdk.Fn.importValue('${props.appName}-${props.stage}-provenance-bucket-name')}`,
+                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`)}`,
+                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`)}`,
                 props.paramsResourceStack.provenancePublicBucket.bucketArn
               ]
             })
@@ -125,7 +125,7 @@ export class BatchStack extends cdk.Stack {
       logGroup: embedSpectrumWatermarkLogGroup,
       environment: {
         APP_NAME: props.appName,
-        POST_DATA_BUCKET: cdk.Fn.importValue('${props.appName}-${props.stage}-post-data-bucket-name'),
+        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
         STAGE: props.stage
       }
     });
@@ -148,7 +148,7 @@ export class BatchStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
-        POST_DATA_BUCKET: cdk.Fn.importValue('${props.appName}-${props.stage}-post-data-bucket-name'),
+        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
         STAGE: props.stage
       }
     });
@@ -170,8 +170,8 @@ export class BatchStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
-        POST_DATA_BUCKET: cdk.Fn.importValue('${props.appName}-${props.stage}-post-data-bucket-name'),
-        PROVENANCE_BUCKET: cdk.Fn.importValue('${props.appName}-${props.stage}-provenance-bucket-name'),
+        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
+        PROVENANCE_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`),
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
         STAGE: props.stage
       }
@@ -194,8 +194,8 @@ export class BatchStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
-        POST_DATA_BUCKET: cdk.Fn.importValue('${props.appName}-${props.stage}-post-data-bucket-name'),
-        PROVENANCE_BUCKET: cdk.Fn.importValue('${props.appName}-${props.stage}-provenance-bucket-name'),
+        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
+        PROVENANCE_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`),
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
         CLOUDFRONT_DISTRIBUTION_ID: cdk.Fn.importValue(`${props.appName}-${props.stage}-distribution-id`),
         STAGE: props.stage
@@ -259,7 +259,7 @@ export class BatchStack extends cdk.Stack {
     stateMachine.grantStartExecution(triggerFunction);
 
     // SQSイベントソース
-    const postQueueArn = cdk.Fn.importValue('${props.appName}-${props.stage}-post-queue-arn');
+    const postQueueArn = cdk.Fn.importValue(`${props.appName}-${props.stage}-post-queue-arn`);
     const postQueue = sqs.Queue.fromQueueArn(this, 'ImportedPostQueue', postQueueArn);
     triggerFunction.addEventSource(new eventsources.SqsEventSource(postQueue, {
       batchSize: 1
