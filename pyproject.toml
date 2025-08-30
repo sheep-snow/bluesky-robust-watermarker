@@ -5,6 +5,7 @@ description = ""
 authors = [
     {name = "sheep-snow",email = "71830342+sheep-snow@users.noreply.github.com"}
 ]
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -14,6 +15,8 @@ dependencies = [
     "numpy (>=1.24.0,<2.0.0)"
 ]
 
+[tool.poetry]
+package-mode = false
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
