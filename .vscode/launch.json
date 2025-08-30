@@ -1,0 +1,46 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug App",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            // "program": "${workspaceFolder}/lambda/settings.py",
+            "args": [],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/lambda:${PYTHONPATH}",
+            },
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Run Test",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "console": "integratedTerminal",
+            "args": [
+                "tests/",
+                "--junit-xml=${workspaceFolder}/.unittest_results.xml"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/lambda:${PYTHONPATH}",
+            },
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Run Ruff Check",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "ruff",
+            "console": "integratedTerminal",
+            "args": [
+                "check"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/lambda:${PYTHONPATH}",
+            },
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

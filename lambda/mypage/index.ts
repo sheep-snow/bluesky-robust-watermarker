@@ -1,0 +1,955 @@
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { KMSClient, EncryptCommand, DecryptCommand } = require('@aws-sdk/client-kms');
+const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
+const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
+const { AtpAgent } = require('@atproto/api');
+const { sanitizeUserInput } = require('../common/sanitize');
+const { detectImageFormat, getImageExtension, getContentType } = require('../common/image-utils');
+
+// アプリ名を環境変数から取得
+const APP_NAME = process.env.APP_NAME || 'brw';
+
+function decodeJWT(token: string) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], 'base64').toString('utf8');
+    return JSON.parse(payload);
+  } catch (error) {
+    return null;
+  }
+}
+
+const s3Client = new S3Client({ region: process.env.AWS_REGION });
+const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
+const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
+const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
+
+// Snowflake ID generator
+class SnowflakeGenerator {
+  static EPOCH = 1640995200000; // 2022-01-01 00:00:00 UTC
+  static sequence = 0;
+  static lastTimestamp = -1;
+
+  static generate() {
+    let timestamp = Date.now();
+    if (timestamp < this.lastTimestamp) {
+      throw new Error('Clock moved backwards');
+    }
+    if (timestamp === this.lastTimestamp) {
+      this.sequence = (this.sequence + 1) & 0xfff;
+      if (this.sequence === 0) {
+        timestamp = this.waitNextMillis(this.lastTimestamp);
+      }
+    } else {
+      this.sequence = 0;
+    }
+    this.lastTimestamp = timestamp;
+    const timestampPart = (timestamp - this.EPOCH) << 22;
+    const machineId = 1 << 17;
+    const sequencePart = this.sequence;
+    return (timestampPart | machineId | sequencePart).toString();
+  }
+
+  static waitNextMillis(lastTimestamp: number) {
+    let timestamp = Date.now();
+    while (timestamp <= lastTimestamp) {
+      timestamp = Date.now();
+    }
+    return timestamp;
+  }
+}
+
+// UUID generator
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Generate empty provenance list page for new users
+async function generateEmptyProvenanceList(userInfo: any) {
+  const listPageHtml = `
+<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+    <title>${APP_NAME} - ${userInfo.blueskyUserId} Provenance List</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      function initTheme() {
+        const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      }
+      function changeTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('${APP_NAME.toLowerCase()}-theme', theme);
+      }
+      document.addEventListener('DOMContentLoaded', initTheme);
+    </script>
+</head>
+<body class="min-h-screen flex flex-col bg-base-200">
+    <div class="navbar bg-base-100 shadow-lg">
+      <div class="navbar-start">
+        <a href="/" class="btn btn-ghost text-xl">📄 ${APP_NAME}</a>
+      </div>
+      <div class="navbar-center hidden lg:flex">
+        <ul class="menu menu-horizontal px-1">
+          <li><a href="/">Home</a></li>
+          <li><a href="/mypage">My Page</a></li>
+          <li><a href="/users/${userInfo.provenancePageId}.html" class="active">Provenance List</a></li>
+        </ul>
+      </div>
+      <div class="navbar-end">
+        <div class="dropdown dropdown-end">
+          <div tabindex="0" role="button" class="btn btn-ghost">
+            Theme
+            <svg width="12px" height="12px" class="h-2 w-2 fill-current opacity-60 inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="m1799 349 242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
+          </div>
+          <ul tabindex="0" class="dropdown-content z-[1] p-2 shadow-2xl bg-base-300 rounded-box w-52">
+            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Cupcake" value="cupcake" onclick="changeTheme('cupcake')"/></li>
+            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Dark" value="dark" onclick="changeTheme('dark')"/></li>
+            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Emerald" value="emerald" onclick="changeTheme('emerald')"/></li>
+            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Corporate" value="corporate" onclick="changeTheme('corporate')"/></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div class="container mx-auto px-4 py-8 flex-1">
+      <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+        <div class="hero-content text-center py-12">
+          <div class="max-w-md">
+            <h1 class="mb-5 text-4xl font-bold">📄 Provenance List</h1>
+            <h2 class="mb-5 text-2xl font-bold">${userInfo.blueskyUserId}</h2>
+            <p class="mb-5 text-lg">Verified image provenance records</p>
+            <div class="flex gap-4 justify-center">
+              <a href="/mypage" class="btn btn-outline btn-primary">← Back to My Page</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats stats-vertical lg:stats-horizontal shadow mb-8 bg-base-100">
+        <div class="stat">
+          <div class="stat-figure text-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          </div>
+          <div class="stat-title">Total Verified Posts</div>
+          <div class="stat-value text-primary">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-figure text-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path></svg>
+          </div>
+          <div class="stat-title">Last Updated</div>
+          <div class="stat-value text-secondary text-lg">${new Date().toLocaleDateString()}</div>
+          <div class="stat-desc">${new Date().toLocaleTimeString()}</div>
+        </div>
+      </div>
+
+      <div class="hero min-h-64 bg-base-100 rounded-lg">
+        <div class="hero-content text-center">
+          <div class="max-w-md">
+            <div class="text-6xl mb-4">🔍</div>
+            <h3 class="text-xl font-bold mb-4">No Verified Posts Found</h3>
+            <p class="text-base-content/70">No verified posts found for this user yet. Start creating posts with provenance tracking!</p>
+            <div class="mt-6">
+              <a href="/mypage" class="btn btn-primary">Create Your First Post</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="text-center py-8 bg-base-300">
+      <p class="text-base-content">This page was generated by ${APP_NAME} to list all verified provenance records for this user.</p>
+    </div>
+    
+    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+      <div>
+        <a href="/" class="btn btn-ghost">🔍 ${APP_NAME} Home</a>
+        <p class="mt-2">Copyright © 2025 - All right reserved by ${APP_NAME}</p>
+      </div>
+    </footer>
+</body>
+</html>`;
+
+  // Save empty user list page to public bucket
+  const listPageCommand = new PutObjectCommand({
+    Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
+    Key: `users/${userInfo.provenancePageId}.html`,
+    Body: listPageHtml,
+    ContentType: 'text/html'
+  });
+  await s3Client.send(listPageCommand);
+
+  console.log(`Empty provenance list created for user: ${userInfo.blueskyUserId}`);
+}
+
+// Check if provenance list exists for a user
+async function checkProvenanceListExists(provenancePageId: string): Promise<boolean> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
+      Key: `users/${provenancePageId}.html`
+    });
+    await s3Client.send(command);
+    return true;
+  } catch (error: any) {
+    if (error.name === 'NoSuchKey') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function encryptPassword(password: string, keyId: string) {
+  const encryptCommand = new EncryptCommand({
+    KeyId: keyId,
+    Plaintext: Buffer.from(password, 'utf8')
+  });
+  const result = await kmsClient.send(encryptCommand);
+  return Buffer.from(result.CiphertextBlob).toString('base64');
+}
+
+async function decryptPassword(encryptedPassword: string, keyId: string) {
+  const decryptCommand = new DecryptCommand({
+    CiphertextBlob: Buffer.from(encryptedPassword, 'base64')
+  });
+  const result = await kmsClient.send(decryptCommand);
+  return Buffer.from(result.Plaintext).toString('utf8');
+}
+
+async function getUserInfo(userId: string) {
+  try {
+    const getCommand = new GetObjectCommand({
+      Bucket: process.env.USER_INFO_BUCKET,
+      Key: `${userId}.json`
+    });
+    const result = await s3Client.send(getCommand);
+    const rawUserInfo = JSON.parse(await result.Body.transformToString());
+    const userInfo = sanitizeUserInput(rawUserInfo);
+    // App Passwordは返さない
+    return {
+      blueskyUserId: userInfo.blueskyUserId,
+      updatedAt: userInfo.updatedAt,
+      validatedAt: userInfo.validatedAt,
+      provenancePageId: userInfo.provenancePageId,
+      createdAt: userInfo.createdAt // 追加
+    };
+  } catch (error: any) {
+    if (error.name === 'NoSuchKey') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+
+async function validateBlueskyCredentials(userId: string, appPassword: string) {
+  console.log('Starting Bluesky validation for:', userId);
+
+  try {
+    const agent = new AtpAgent({ service: 'https://bsky.social' });
+    console.log('AtpAgent created successfully');
+
+    console.log('Login parameters:');
+    console.log('  - identifier:', JSON.stringify(userId));
+    console.log('  - password: [REDACTED]');
+    console.log('  - password length:', appPassword.length);
+
+    try {
+      const loginResult = await agent.login({
+        identifier: userId,
+        password: appPassword
+      });
+
+      console.log('✅ Login successful!');
+      console.log('Login result type:', typeof loginResult);
+      console.log('Login result success:', loginResult?.success);
+
+      if (agent.session) {
+        console.log('✅ Session created successfully');
+        console.log('Session DID:', agent.session.did);
+        console.log('Session handle:', agent.session.handle);
+        return true;
+      } else {
+        console.log('⚠️ Login succeeded but no session created');
+        return false;
+      }
+    } catch (loginError: any) {
+      console.log('❌ Login failed with error:');
+      console.log('Error type:', typeof loginError);
+      console.log('Error name:', loginError.name);
+      console.log('Error message:', loginError.message);
+      console.log('Error status:', loginError.status);
+      console.log('Error cause:', loginError.cause);
+      console.log('Error stack:', loginError.stack);
+
+      if (loginError.headers) {
+        console.log('Error headers:', loginError.headers);
+      }
+
+      return false;
+    }
+
+  } catch (error: any) {
+    console.error('❌ Fatal error in validateBlueskyCredentials:');
+    console.error('Error message:', error.message);
+    return false;
+  }
+}
+
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  try {
+    // Log event without body to avoid large image data in logs
+    const logEvent = { ...event, body: event.body ? '[BODY_PRESENT]' : null };
+    console.log('Event:', JSON.stringify(logEvent, null, 2));
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+      return { statusCode: 200, headers, body: '' };
+    }
+
+    if (event.httpMethod === 'GET') {
+      // Handle /mypage/info endpoint for user info retrieval
+      if (event.path === '/mypage/info' || (event.pathParameters && event.pathParameters.proxy === 'info')) {
+        const authHeader = event.headers.Authorization || event.headers.authorization;
+        if (!authHeader) {
+          return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+        }
+
+        try {
+          const token = authHeader.replace('Bearer ', '');
+          const decoded = decodeJWT(token);
+          console.log('Decoded token userId:', decoded?.sub);
+          const userId = decoded?.sub;
+
+          if (!userId) {
+            console.log('No userId found in token');
+            return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid token' }) };
+          }
+
+          const userInfo = await getUserInfo(userId);
+
+          // If user info exists but provenance list doesn't exist, create it
+          if (userInfo && userInfo.provenancePageId) {
+            try {
+              const provenanceListExists = await checkProvenanceListExists(userInfo.provenancePageId);
+              if (!provenanceListExists) {
+                console.log(`Provenance list not found for user ${userInfo.blueskyUserId}, creating empty list`);
+                await generateEmptyProvenanceList(userInfo);
+              }
+            } catch (error) {
+              console.error('Failed to check/create provenance list:', error);
+              // Don't fail the entire request if provenance list check fails
+            }
+          }
+
+          return { statusCode: 200, headers, body: JSON.stringify(userInfo || {}) };
+        } catch (error) {
+          console.error('Get user info error:', error);
+          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to get user info' }) };
+        }
+      }
+
+      const html = `
+      <!DOCTYPE html>
+      <html data-theme="cupcake">
+      <head>
+        <title>${APP_NAME} - My Page</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+          function initTheme() {
+            const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+          }
+          function changeTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('${APP_NAME.toLowerCase()}-theme', theme);
+          }
+          document.addEventListener('DOMContentLoaded', initTheme);
+        </script>
+      </head>
+      <body class="min-h-screen flex flex-col bg-base-200">
+        <div class="navbar bg-base-100 shadow-lg">
+          <div class="navbar-start">
+            <a href="/" class="btn btn-ghost text-xl"> ${APP_NAME}</a>
+          </div>
+          <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1">
+              <li><a href="/">Home</a></li>
+              <li><a href="/signup">Sign Up</a></li>
+              <li><a href="/login">Login</a></li>
+              <li><a href="/mypage" class="active">My Page</a></li>
+              <li><a href="/verify-watermark">Verify</a></li>
+            </ul>
+          </div>
+          <div class="navbar-end">
+            <div class="dropdown dropdown-end">
+              <div tabindex="0" role="button" class="btn btn-ghost">
+                Theme
+                <svg width="12px" height="12px" class="h-2 w-2 fill-current opacity-60 inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="m1799 349 242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
+              </div>
+              <ul tabindex="0" class="dropdown-content z-[1] p-2 shadow-2xl bg-base-300 rounded-box w-52">
+                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Cupcake" value="cupcake" onclick="changeTheme('cupcake')"/></li>
+                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Dark" value="dark" onclick="changeTheme('dark')"/></li>
+                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Emerald" value="emerald" onclick="changeTheme('emerald')"/></li>
+                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Corporate" value="corporate" onclick="changeTheme('corporate')"/></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <main class="flex-1 container mx-auto px-4 py-8">
+          <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+            <div class="hero-content text-center py-12">
+              <div class="max-w-md">
+                <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
+                <p class="mb-5 text-lg">Manage your Bluesky settings and create posts</p>
+              </div>
+            </div>
+          </div>
+          
+          <div id="authStatus" class="alert alert-info">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span>Checking authentication...</span>
+          </div>
+          
+          <div id="content" class="hidden">
+            <div class="flex justify-end mb-6 gap-4">
+              <a href="#" id="provenanceListLink" class="btn btn-outline hidden">View My Provenance List</a>
+              <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                  <h2 class="card-title text-2xl mb-4">🔗 Bluesky Settings</h2>
+                  <form id="settingsForm" class="space-y-4">
+                    <div class="form-control">
+                      <label class="label">
+                        <span class="label-text font-semibold">Bluesky User ID</span>
+                      </label>
+                      <input type="text" id="blueskyUserId" placeholder="alice.bsky.social or @alice.bsky.social" class="input input-bordered" />
+                    </div>
+                    <div class="form-control">
+                      <label class="label">
+                        <span class="label-text font-semibold">Bluesky App Password</span>
+                      </label>
+                      <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">Save Settings</button>
+                  </form>
+                </div>
+              </div>
+              
+              <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                  <h2 class="card-title text-2xl mb-4">✍️ Create Post</h2>
+                  <form id="postForm" class="space-y-4">
+                    <div class="form-control">
+                      <label class="label">
+                        <span class="label-text font-semibold">Post Text</span>
+                      </label>
+                      <textarea id="postText" rows="4" placeholder="What's happening?" class="textarea textarea-bordered"></textarea>
+                    </div>
+                    <div class="form-control">
+                      <label class="label">
+                        <span class="label-text font-semibold">Image</span>
+                      </label>
+                      <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
+                    </div>
+                    <button type="submit" class="btn btn-accent w-full">Create Post</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            
+            <div id="userInfo" class="card bg-base-100 shadow-xl mt-8 hidden">
+              <div class="card-body">
+                <h3 class="card-title text-xl mb-4">📊 Current Settings</h3>
+                <div class="stats stats-vertical lg:stats-horizontal shadow">
+                  <div class="stat">
+                    <div class="stat-title">Bluesky User ID</div>
+                    <div class="stat-value text-lg" id="currentUserId"></div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-title">Last Updated</div>
+                    <div class="stat-value text-lg" id="lastUpdated"></div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat-title">Last Validated</div>
+                    <div class="stat-value text-lg" id="lastValidated"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Processing Modal -->
+          <dialog id="processingModal" class="modal">
+            <div class="modal-box">
+              <h3 class="font-bold text-lg">🔄 Processing Your Post</h3>
+              <div class="py-4">
+                <div class="flex items-center space-x-4">
+                  <span class="loading loading-spinner loading-lg text-primary"></span>
+                  <div>
+                    <p class="text-base-content">Post ID: <span id="processingPostId" class="font-mono font-bold"></span></p>
+                    <p class="text-sm text-base-content/70 mt-2" id="processingStatus">Generating provenance page...</p>
+                  </div>
+                </div>
+                <div class="mt-6">
+                  <progress class="progress progress-primary w-full" id="processingProgress"></progress>
+                  <div class="text-xs text-base-content/70 mt-4">
+                    <div id="processingSteps" class="space-y-2">
+                      <div class="step flex items-center space-x-2" id="step-watermark">
+                        <span>📝</span><span>Embedding watermark...</span>
+                      </div>
+                      <div class="step flex items-center space-x-2" id="step-bluesky">
+                        <span>🦋</span><span>Posting to Bluesky...</span>
+                      </div>
+                      <div class="step flex items-center space-x-2" id="step-provenance">
+                        <span>📄</span><span>Generating provenance page...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+              <button>close</button>
+            </form>
+          </dialog>
+          
+        <script>
+          // Check authentication
+          const accessToken = localStorage.getItem('access_token');
+          const idToken = localStorage.getItem('id_token');
+          
+          if (!accessToken || !idToken) {
+            document.getElementById('authStatus').innerHTML = 
+              '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><span>Not authenticated. <a href="/signup" class="link">Please sign up</a> or <a href="/login" class="link">login</a>.</span>';
+            document.getElementById('authStatus').className = 'alert alert-warning';
+          } else {
+            document.getElementById('authStatus').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+            
+            // Load existing user info
+            loadUserInfo();
+            
+            // Settings form submission
+            document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const data = {
+                blueskyUserId: document.getElementById('blueskyUserId').value,
+                blueskyAppPassword: document.getElementById('blueskyAppPassword').value
+              };
+              
+              const response = await fetch('/mypage', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + accessToken
+                },
+                body: JSON.stringify(data)
+              });
+              
+              if (response.ok) {
+                alert('Settings saved and validated successfully!');
+                loadUserInfo();
+              } else {
+                const errorData = await response.json();
+                alert('Failed to save settings: ' + (errorData.error || 'Unknown error'));
+              }
+            });
+            
+            // Post form submission
+            document.getElementById('postForm').addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const text = document.getElementById('postText').value;
+              const imageFile = document.getElementById('postImage').files[0];
+              
+              let imageBase64 = null;
+              if (imageFile) {
+                // Convert image to base64
+                const reader = new FileReader();
+                imageBase64 = await new Promise((resolve) => {
+                  reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/...;base64, prefix
+                  reader.readAsDataURL(imageFile);
+                });
+              }
+              
+              const postData = {
+                text: text,
+                image: imageBase64
+              };
+              
+              const response = await fetch('/mypage/post', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + accessToken
+                },
+                body: JSON.stringify(postData)
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                
+                // Show processing modal
+                showProcessingModal(result.postId);
+                
+                // Reset form
+                document.getElementById('postForm').reset();
+                
+                // Start checking for provenance page generation
+                checkProvenanceGeneration(result.postId);
+              } else {
+                const errorData = await response.json();
+                alert('Failed to create post: ' + (errorData.error || 'Unknown error'));
+              }
+            });
+          }
+          
+          async function loadUserInfo() {
+            try {
+              const response = await fetch('/mypage/info', {
+                method: 'GET',
+                headers: {
+                  'Authorization': 'Bearer ' + accessToken
+                }
+              });
+              
+              if (response.ok) {
+                const userInfo = await response.json();
+                if (userInfo.blueskyUserId) {
+                  document.getElementById('blueskyUserId').value = userInfo.blueskyUserId;
+                  document.getElementById('currentUserId').textContent = userInfo.blueskyUserId;
+                  document.getElementById('lastUpdated').textContent = new Date(userInfo.updatedAt).toLocaleString();
+                  document.getElementById('lastValidated').textContent = new Date(userInfo.validatedAt).toLocaleString();
+                  document.getElementById('userInfo').classList.remove('hidden');
+                  
+                  // Show provenance list link if user has provenance page ID
+                  if (userInfo.provenancePageId) {
+                    const provenanceLink = document.getElementById('provenanceListLink');
+                    provenanceLink.href = '/users/' + userInfo.provenancePageId + '.html';
+                    provenanceLink.classList.remove('hidden');
+                  }
+                }
+              }
+            } catch (error) {
+              console.log('No existing user info found');
+            }
+          }
+          
+          function showProcessingModal(postId) {
+            document.getElementById('processingPostId').textContent = postId;
+            document.getElementById('processingModal').showModal();
+            updateProcessingProgress(0, 'Initializing processing...');
+          }
+          
+          function updateProcessingProgress(percentage, status) {
+            document.getElementById('processingProgress').value = percentage;
+            document.getElementById('processingStatus').textContent = status;
+          }
+          
+          function updateProcessingStep(stepId, completed = false) {
+            const step = document.getElementById(stepId);
+            if (completed) {
+              step.style.color = '#10b981';
+              const icon = step.querySelector('span:first-child');
+              icon.textContent = '✅';
+            }
+          }
+          
+          async function checkProvenanceGeneration(postId) {
+            const maxAttempts = 60; // 5 minutes maximum (5 second intervals)
+            let attempts = 0;
+            
+            const checkInterval = setInterval(async () => {
+              attempts++;
+              
+              try {
+                // Update progress based on attempts
+                const progress = Math.min((attempts / maxAttempts) * 100, 90);
+                
+                if (attempts <= 20) {
+                  updateProcessingProgress(progress, 'Embedding watermark and posting to Bluesky...');
+                  if (attempts === 10) updateProcessingStep('step-watermark', true);
+                  if (attempts === 20) updateProcessingStep('step-bluesky', true);
+                } else {
+                  updateProcessingProgress(progress, 'Generating provenance page...');
+                }
+                
+                // Check if provenance page exists
+                const response = await fetch('/provenance/' + postId + '/', {
+                  method: 'HEAD'
+                });
+                
+                if (response.ok) {
+                  // Provenance page is ready
+                  clearInterval(checkInterval);
+                  updateProcessingStep('step-provenance', true);
+                  updateProcessingProgress(100, 'Provenance page generated successfully!');
+                  
+                  setTimeout(() => {
+                    document.getElementById('processingModal').close();
+                    window.location.href = '/provenance/' + postId + '/';
+                  }, 1000);
+                }
+                
+                if (attempts >= maxAttempts) {
+                  // Timeout
+                  clearInterval(checkInterval);
+                  updateProcessingProgress(100, 'Timeout - please check manually');
+                  
+                  setTimeout(() => {
+                    document.getElementById('processingModal').close();
+                    alert('Processing is taking longer than expected. You can check the provenance page manually.');
+                    window.location.href = '/provenance/' + postId + '/';
+                  }, 2000);
+                }
+                
+              } catch (error) {
+                console.log('Checking provenance page...', error);
+              }
+            }, 5000); // Check every 5 seconds
+          }
+          
+          function logout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('refresh_token');
+            window.location.reload();
+          }
+        </script>
+        </main>
+        
+        <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+          <nav class="grid grid-flow-col gap-4">
+            <a href="/" class="link link-hover">Home</a>
+            <a href="/signup" class="link link-hover">Sign Up</a>
+            <a href="/login" class="link link-hover">Login</a>
+            <a href="/mypage" class="link link-hover">My Page</a>
+            <a href="/verify-watermark" class="link link-hover">Verify</a>
+          </nav>
+          <aside>
+            <p>© 2025 ${APP_NAME} - Image Provenance Service</p>
+          </aside>
+        </footer>
+      </body>
+      </html>
+    `;
+      return { statusCode: 200, headers: { ...headers, 'Content-Type': 'text/html' }, body: html };
+    }
+
+    if (event.httpMethod === 'POST') {
+      console.log('POST request received');
+      const authHeader = event.headers.Authorization || event.headers.authorization;
+      if (!authHeader) {
+        console.log('No authorization header found');
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      const decoded = decodeJWT(token);
+      const userId = decoded?.sub;
+
+      if (!userId) {
+        return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid token' }) };
+      }
+
+      // Handle post creation
+      if (event.path === '/mypage/post' || (event.pathParameters && event.pathParameters.proxy === 'post')) {
+        try {
+          // Parse JSON data with base64 encoded image
+          const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+          if (!contentType || !contentType.includes('application/json')) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid content type, expected application/json' }) };
+          }
+
+          if (!event.body) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request body is required' }) };
+          }
+
+          const rawBody = JSON.parse(event.body);
+          const body = sanitizeUserInput(rawBody);
+          // Log body without image data
+          const logBody = { ...body };
+          if (logBody.image) {
+            logBody.image = `[IMAGE_DATA_${logBody.image.length}_BYTES]`;
+          }
+          console.log('Post creation body:', JSON.stringify(logBody, null, 2));
+          const postId = SnowflakeGenerator.generate();
+
+          let postData = {
+            postId,
+            userId,
+            text: body.text || '',
+            image: body.image || null,
+            createdAt: new Date().toISOString()
+          };
+
+          // Save image if provided with format detection
+          let imageFormat = null;
+          let imageExtension = null;
+          if (body.image) {
+            const imageBuffer = Buffer.from(body.image, 'base64');
+            imageFormat = detectImageFormat(new Uint8Array(imageBuffer));
+            imageExtension = getImageExtension(imageFormat);
+            const contentType = getContentType(imageFormat);
+
+            const imageCommand = new PutObjectCommand({
+              Bucket: process.env.POST_DATA_BUCKET,
+              Key: `${postId}/image.${imageExtension}`,
+              Body: imageBuffer,
+              ContentType: contentType
+            });
+            await s3Client.send(imageCommand);
+          }
+
+          // Save post data to S3
+          const postDataWithImage = {
+            ...postData,
+            ...(imageFormat && { imageFormat: imageFormat }),
+            ...(imageExtension && { imageExtension: imageExtension })
+          };
+
+          const putCommand = new PutObjectCommand({
+            Bucket: process.env.POST_DATA_BUCKET,
+            Key: `${postId}/post.json`,
+            Body: JSON.stringify(postDataWithImage),
+            ContentType: 'application/json'
+          });
+          await s3Client.send(putCommand);
+
+          // Send message to post queue
+          const queueMessage = {
+            postId,
+            userId,
+            bucket: process.env.POST_DATA_BUCKET,
+            timestamp: new Date().toISOString()
+          };
+
+          const sendCommand = new SendMessageCommand({
+            QueueUrl: process.env.POST_QUEUE_URL,
+            MessageBody: JSON.stringify(queueMessage)
+          });
+          await sqsClient.send(sendCommand);
+
+          return { statusCode: 200, headers, body: JSON.stringify({ postId, message: 'Post queued successfully' }) };
+        } catch (error) {
+          console.error('Post creation error:', error);
+          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create post' }) };
+        }
+      } else {
+        // Handle settings update
+        try {
+          if (!event.body) {
+            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request body is required' }) };
+          }
+
+          const rawBody = JSON.parse(event.body);
+          const body = sanitizeUserInput(rawBody);
+          // Log body without sensitive data to avoid large logs and security issues
+          const logBody = { ...body };
+          if (logBody.image) {
+            logBody.image = `[IMAGE_DATA_${logBody.image.length}_BYTES]`;
+          }
+          if (logBody.blueskyAppPassword) {
+            logBody.blueskyAppPassword = '[REDACTED]';
+          }
+          console.log('Request body:', JSON.stringify(logBody, null, 2));
+
+          console.log('Starting Bluesky validation...');
+          const isValid = await validateBlueskyCredentials(body.blueskyUserId, body.blueskyAppPassword);
+          if (!isValid) {
+            return {
+              statusCode: 400,
+              headers,
+              body: JSON.stringify({ error: 'Invalid Bluesky credentials. Please check your User ID and App Password.' })
+            };
+          }
+
+          const keyParam = await ssmClient.send(new GetParameterCommand({
+            Name: `/${APP_NAME}/${process.env.STAGE}/kms-key-id`
+          }));
+          const kmsKeyId = keyParam.Parameter.Value;
+
+          const encryptedPassword = await encryptPassword(body.blueskyAppPassword, kmsKeyId);
+
+          // Check if user info already exists and merge
+          const existingUserInfo = await getUserInfo(userId);
+
+          const userInfo = {
+            blueskyUserId: body.blueskyUserId,
+            encryptedBlueskyAppPassword: encryptedPassword,
+            provenancePageId: existingUserInfo?.provenancePageId || generateUUID(),
+            updatedAt: new Date().toISOString(),
+            validatedAt: new Date().toISOString(),
+            ...(existingUserInfo && { createdAt: existingUserInfo.createdAt })
+          };
+
+          // Set createdAt if this is a new user
+          const isNewUser = !existingUserInfo;
+          if (isNewUser) {
+            userInfo.createdAt = userInfo.updatedAt;
+          }
+
+          const putCommand = new PutObjectCommand({
+            Bucket: process.env.USER_INFO_BUCKET,
+            Key: `${userId}.json`,
+            Body: JSON.stringify(userInfo),
+            ContentType: 'application/json'
+          });
+
+          await s3Client.send(putCommand);
+
+          // Generate empty provenance list for new users
+          if (isNewUser) {
+            try {
+              await generateEmptyProvenanceList(userInfo);
+              console.log(`Empty provenance list created for new user: ${userInfo.blueskyUserId}`);
+            } catch (error) {
+              console.error('Failed to create empty provenance list:', error);
+              // Don't fail the entire request if provenance list creation fails
+            }
+          }
+
+          return { statusCode: 200, headers, body: JSON.stringify({ message: 'Settings saved and validated successfully' }) };
+        } catch (error) {
+          console.error('Save settings error:', error);
+          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to save settings' }) };
+        }
+      }
+    }
+
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+  } catch (outerError) {
+    console.error('Unexpected error:', outerError);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) };
+  }
+};
