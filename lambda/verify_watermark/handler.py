@@ -88,7 +88,7 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
         Dictionary with extracted ID, method, and confidence
     """
     logger.info(
-        f"Extracting Snowflake ID from watermark, image size: {len(image_data)} bytes"
+        "Extracting Snowflake ID from watermark, image size: %d bytes", len(image_data)
     )
 
     try:
@@ -105,7 +105,7 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
                 temp_file.flush()
                 temp_path = temp_file.name
 
-                logger.info(f"Extracting Snowflake ID from: {temp_path}")
+                logger.info("Extracting Snowflake ID from: %s", temp_path)
 
                 # Initialize blind watermark for extraction
                 bwm = WaterMark(password_img=1, password_wm=1)
@@ -127,7 +127,7 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
                             snowflake_id = str(extracted_data["postId"])
                             confidence = 0.95
                             logger.info(
-                                f"Successfully extracted Snowflake ID: {snowflake_id}"
+                                "Successfully extracted Snowflake ID: %s", snowflake_id
                             )
                         else:
                             logger.warning(
@@ -137,7 +137,8 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
                         logger.warning("Extracted text is empty after cleaning")
                 except json.JSONDecodeError:
                     logger.warning(
-                        f"Could not parse extracted text as JSON: {repr(extracted_text[:100])}"
+                        "Could not parse extracted text as JSON: %s",
+                        repr(extracted_text[:100]),
                     )
 
                 return {
@@ -155,7 +156,7 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
 
     except Exception as error:
         logger.error(
-            f"Error in extract_snowflake_id_from_watermark: {error}", exc_info=True
+            "Error in extract_snowflake_id_from_watermark: %s", error, exc_info=True
         )
         return {
             "extractedId": None,
@@ -169,10 +170,10 @@ def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[byt
     try:
         boundary = content_type.split("boundary=")[1]
         if not boundary:
-            logger.error("No boundary found in content-type:", content_type)
+            logger.error("No boundary found in content-type: %s", content_type)
             return None
 
-        logger.info("Parsing multipart with boundary:", boundary)
+        logger.info("Parsing multipart with boundary: %s", boundary)
 
         body_string = body.decode("latin-1")  # Use latin-1 to preserve binary data
 
@@ -192,11 +193,11 @@ def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[byt
             headers = part[:header_end_index]
             content = part[header_end_index + 4 :]
 
-            logger.info("Part headers:", headers)
+            logger.info("Part headers: %s", headers)
 
             # Check if this part contains the image field
             if 'name="image"' in headers and "Content-Type: image/" in headers:
-                logger.info("Found image part, content length:", len(content))
+                logger.info("Found image part, content length: %d", len(content))
 
                 # Convert string back to bytes, then remove trailing CRLF if present
                 content_bytes = content.encode("latin-1")
@@ -204,20 +205,20 @@ def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[byt
                 if len(content_bytes) >= 2 and content_bytes[-2:] == b"\r\n":
                     content_bytes = content_bytes[:-2]
 
-                logger.info("Extracted image data length:", len(content_bytes))
+                logger.info("Extracted image data length: %d", len(content_bytes))
                 return content_bytes
 
         logger.info("No image field found in multipart data")
         return None
     except Exception as error:
-        logger.error("Error extracting image from multipart:", error)
+        logger.error("Error extracting image from multipart: %s", error)
         return None
 
 
 async def get_provenance_data(post_id: str) -> Optional[Dict[str, Any]]:
     """Get provenance data for a post ID."""
     try:
-        logger.info(f"Looking up provenance data for postId: {post_id}")
+        logger.info("Looking up provenance data for postId: %s", post_id)
 
         # Get provenance bucket name from environment variables
         provenance_public_bucket = os.environ.get("PROVENANCE_PUBLIC_BUCKET")
@@ -231,7 +232,7 @@ async def get_provenance_data(post_id: str) -> Optional[Dict[str, Any]]:
                 Bucket=provenance_public_bucket, Key=f"provenance/{post_id}/index.html"
             )
 
-            logger.info(f"Found provenance data for postId: {post_id}")
+            logger.info("Found provenance data for postId: %s", post_id)
 
             # Return basic data indicating provenance exists
             return {
@@ -244,20 +245,21 @@ async def get_provenance_data(post_id: str) -> Optional[Dict[str, Any]]:
             }
 
         except s3_client.exceptions.NoSuchKey:
-            logger.info(f"No provenance data found for postId: {post_id}")
+            logger.info("No provenance data found for postId: %s", post_id)
             return None
         except Exception as s3_error:
-            logger.error("S3 error checking provenance:", s3_error)
+            logger.error("S3 error checking provenance: %s", s3_error)
             return None
 
     except Exception as error:
-        logger.error("Error getting provenance data:", error)
+        logger.error("Error getting provenance data: %s", error)
         return None
 
 
 def generate_upload_form_html() -> str:
     """Generate the HTML form for watermark verification."""
-    return """<!DOCTYPE html>
+    app_name_lower = APP_NAME.lower()
+    return f"""<!DOCTYPE html>
 <html data-theme="cupcake">
 <head>
     <title>{APP_NAME} - 透かし検証</title>
@@ -266,14 +268,14 @@ def generate_upload_form_html() -> str:
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      function initTheme() {
-        const savedTheme = localStorage.getItem(f'{APP_NAME.lower()}-theme') || 'cupcake';
+      function initTheme() {{
+        const savedTheme = localStorage.getItem('{app_name_lower}-theme') || 'cupcake';
         document.documentElement.setAttribute('data-theme', savedTheme);
-      }
-      function changeTheme(theme) {
+      }}
+      function changeTheme(theme) {{
         document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem(f'{APP_NAME.lower()}-theme', theme);
-      }
+        localStorage.setItem('{app_name_lower}-theme', theme);
+      }}
       document.addEventListener('DOMContentLoaded', initTheme);
     </script>
 </head>
@@ -315,7 +317,7 @@ def generate_upload_form_html() -> str:
         <div class="hero-content text-center py-12">
           <div class="max-w-md">
             <h1 class="mb-5 text-4xl font-bold">🔍 透かし検証</h1>
-            <p class="mb-5 text-lg">画像の真正性を検証します (Python版)</p>
+            <p class="mb-5 text-lg">画像の真正性を検証します</p>
           </div>
         </div>
       </div>
@@ -374,51 +376,51 @@ def generate_upload_form_html() -> str:
     <script>
         let selectedFile = null;
 
-        function handleDragOver(e) {
+        function handleDragOver(e) {{
             e.preventDefault();
-        }
+        }}
 
-        function handleDragEnter(e) {
+        function handleDragEnter(e) {{
             e.preventDefault();
             e.currentTarget.classList.add('border-accent');
-        }
+        }}
 
-        function handleDragLeave(e) {
+        function handleDragLeave(e) {{
             e.preventDefault();
             e.currentTarget.classList.remove('border-accent');
-        }
+        }}
 
-        function handleDrop(e) {
+        function handleDrop(e) {{
             e.preventDefault();
             e.currentTarget.classList.remove('border-accent');
             const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileSelect({target: {files: files}});
-            }
-        }
+            if (files.length > 0) {{
+                handleFileSelect({{target: {{files: files}}}});
+            }}
+        }}
 
-        function handleFileSelect(e) {
+        function handleFileSelect(e) {{
             const file = e.target.files[0];
-            if (file) {
+            if (file) {{
                 selectedFile = file;
                 document.getElementById('file-name').textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + 'MB)';
                 document.getElementById('selected-file').classList.remove('hidden');
                 document.getElementById('verify-btn').disabled = false;
-            }
-        }
+            }}
+        }}
 
-        function clearFile() {
+        function clearFile() {{
             selectedFile = null;
             document.getElementById('file-input').value = '';
             document.getElementById('selected-file').classList.add('hidden');
             document.getElementById('verify-btn').disabled = true;
-        }
+        }}
 
-        async function verifyWatermark() {
-            if (!selectedFile) {
+        async function verifyWatermark() {{
+            if (!selectedFile) {{
                 alert('画像を選択してください');
                 return;
-            }
+            }}
 
             const formData = new FormData();
             formData.append('image', selectedFile);
@@ -428,56 +430,56 @@ def generate_upload_form_html() -> str:
             btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> 解析中...';
             btn.disabled = true;
 
-            try {
-                const response = await fetch(window.location.href, {
+            try {{
+                const response = await fetch(window.location.href, {{
                     method: 'POST',
                     body: formData
-                });
+                }});
 
-                if (response.redirected) {
+                if (response.redirected) {{
                     window.location.href = response.url;
-                } else {
+                }} else {{
                     const result = await response.text();
                     document.getElementById('result').innerHTML = result;
                     document.getElementById('result').classList.remove('hidden');
-                }
-            } catch (error) {
+                }}
+            }} catch (error) {{
                 console.error('Upload error:', error);
                 alert('アップロードエラーが発生しました: ' + error.message);
-            } finally {
+            }} finally {{
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-            }
-        }
+            }}
+        }}
         
         // Check authentication status and update UI
-        function checkAuthAndUpdateUI() {
+        function checkAuthAndUpdateUI() {{
           const accessToken = localStorage.getItem('access_token');
           const idToken = localStorage.getItem('id_token');
           const isAuthenticated = accessToken && idToken;
           
-          if (isAuthenticated) {
+          if (isAuthenticated) {{
             document.getElementById('nav-signup').style.display = 'none';
             document.getElementById('nav-login').style.display = 'none';
             document.getElementById('auth-actions').classList.remove('hidden');
-          } else {
+          }} else {{
             document.getElementById('nav-signup').style.display = 'block';
             document.getElementById('nav-login').style.display = 'block';
             document.getElementById('auth-actions').classList.add('hidden');
-          }
-        }
+          }}
+        }}
         
-        function logout() {
+        function logout() {{
           localStorage.removeItem('access_token');
           localStorage.removeItem('id_token');
           localStorage.removeItem('refresh_token');
           window.location.href = '/';
-        }
+        }}
         
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function() {{
           initTheme();
           checkAuthAndUpdateUI();
-        });
+        }});
     </script>
 </body>
 </html>"""
@@ -603,7 +605,7 @@ def generate_no_watermark_page(extraction_result: Dict[str, Any]) -> str:
         
         <div class="details">
             <h3>検証詳細</h3>
-            <p><strong>検証方法:</strong> {extraction_result.get("method", "不明")} (Python版)</p>
+            <p><strong>検証方法:</strong> {extraction_result.get("method", "不明")}</p>
             <p><strong>信頼度:</strong> {(extraction_result.get("confidence", 0) * 100):.1f}%</p>
             <p><strong>可能な原因:</strong></p>
             <ul>
@@ -689,7 +691,7 @@ def generate_no_provenance_page(post_id: str, extraction_result: Dict[str, Any])
         <div class="details">
             <h3>検出情報</h3>
             <p><strong>検出されたID:</strong> <span class="post-id">{post_id}</span></p>
-            <p><strong>検証方法:</strong> {extraction_result.get("method", "不明")} (Python版)</p>
+            <p><strong>検証方法:</strong> {extraction_result.get("method", "不明")}</p>
             <p><strong>信頼度:</strong> {(extraction_result.get("confidence", 0) * 100):.1f}%</p>
             <p><strong>可能な原因:</strong></p>
             <ul>
@@ -710,7 +712,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Lambda handler for watermark verification.
     """
     logger.info("Verify watermark handler starting...")
-    logger.info(f"Event received: {json.dumps(event, default=str)}")
+    logger.info("Event received: %s", json.dumps(event, default=str))
 
     try:
         # Get HTTP method
@@ -746,7 +748,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     generate_error_page("画像データが見つかりませんでした。")
                 )
 
-            logger.info(f"Processing uploaded image ({len(image_data)} bytes)")
+            logger.info("Processing uploaded image (%d bytes)", len(image_data))
 
             # Extract Snowflake ID from watermark using Python version
             extraction_result = extract_snowflake_id_from_watermark(image_data)
@@ -780,7 +782,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             )
 
     except Exception as error:
-        logger.error("Error in verify watermark handler:", error, exc_info=True)
+        logger.error("Error in verify watermark handler: %s", error, exc_info=True)
         return get_html_response(
             generate_error_page("内部サーバーエラーが発生しました。")
         )

@@ -38,7 +38,7 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
             }
         });
 
-        // Watermark検証 Lambda関数（Python版、公開機能）
+        // Watermark検証 Lambda関数（公開機能）
         const verifyWatermarkLogGroup = ResourcePolicy.createLambdaLogGroup(
             this, 'VerifyWatermarkLogGroup',
             ResourcePolicy.getResourceName(props.appName, props.stage, 'verify-watermark'),
@@ -48,7 +48,7 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
         const verifyWatermarkFunction = new lambda.DockerImageFunction(this, 'VerifyWatermarkFunction', {
             functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'verify-watermark'),
             code: lambda.DockerImageCode.fromImageAsset('.', {
-                cmd: ['lambda.verify_watermark.handler'],
+                cmd: ['lambda.verify_watermark.handler.handler'],
                 file: 'Dockerfile'
             }),
             role: lambdaRole,

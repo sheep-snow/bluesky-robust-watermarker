@@ -105,7 +105,7 @@ export class BatchStack extends cdk.Stack {
       }
     });
 
-    // Python版Spectrum Watermark埋め込み関数 (Docker)
+    // Watermark埋め込み関数 (Docker)
     const embedSpectrumWatermarkLogGroup = ResourcePolicy.createLambdaLogGroup(
       this, 'EmbedSpectrumWatermarkLogGroup',
       ResourcePolicy.getResourceName(props.appName, props.stage, 'embed-spectrum-watermark'),
