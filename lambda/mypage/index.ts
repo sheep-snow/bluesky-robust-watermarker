@@ -25,38 +25,12 @@ const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
 const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
 const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
 
-// Snowflake ID generator
-class SnowflakeGenerator {
-  static EPOCH = 1640995200000; // 2022-01-01 00:00:00 UTC
-  static sequence = 0;
-  static lastTimestamp = -1;
+const { nanoid } = require('nanoid');
 
+// nanoid generator for unique post identification (8 characters for BCH_5 compatibility)
+class PostIdGenerator {
   static generate() {
-    let timestamp = Date.now();
-    if (timestamp < this.lastTimestamp) {
-      throw new Error('Clock moved backwards');
-    }
-    if (timestamp === this.lastTimestamp) {
-      this.sequence = (this.sequence + 1) & 0xfff;
-      if (this.sequence === 0) {
-        timestamp = this.waitNextMillis(this.lastTimestamp);
-      }
-    } else {
-      this.sequence = 0;
-    }
-    this.lastTimestamp = timestamp;
-    const timestampPart = (timestamp - this.EPOCH) << 22;
-    const machineId = 1 << 17;
-    const sequencePart = this.sequence;
-    return (timestampPart | machineId | sequencePart).toString();
-  }
-
-  static waitNextMillis(lastTimestamp: number) {
-    let timestamp = Date.now();
-    while (timestamp <= lastTimestamp) {
-      timestamp = Date.now();
-    }
-    return timestamp;
+    return nanoid(8);
   }
 }
 
@@ -797,7 +771,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             logBody.image = `[IMAGE_DATA_${logBody.image.length}_BYTES]`;
           }
           console.log('Post creation body:', JSON.stringify(logBody, null, 2));
-          const postId = SnowflakeGenerator.generate();
+          const postId = PostIdGenerator.generate();
 
           let postData = {
             postId,

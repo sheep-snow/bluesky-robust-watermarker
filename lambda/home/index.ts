@@ -91,8 +91,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             <h2 class="card-title text-2xl mb-4">What is ${APP_NAME}?</h2>
             <p class="text-lg">
               ${APP_NAME} is a service that helps you prove the authenticity and origin of your images posted on Bluesky. 
-              When you post images through ${APP_NAME}, we embed <a href="https://github.com/iwanders/spread_spectrum_watermarking" class="link link-primary">Spread Spectrum Watermark</a> and create verifiable provenance pages 
-              that others can use to confirm your images are authentic and unmodified.
             </p>
           </div>
         </div>

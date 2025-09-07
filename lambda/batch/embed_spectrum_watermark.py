@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -5,7 +6,8 @@ import tempfile
 from typing import Any, Dict, Optional, Union
 
 import boto3
-from blind_watermark import WaterMark
+from PIL import Image
+from trustmark import TrustMark
 
 # Configure logging
 logger = logging.getLogger()
@@ -52,7 +54,7 @@ def handler(
     event: Dict[str, Any], context: Any
 ) -> Union[Dict[str, Any], Dict[str, str]]:
     """
-    Lambda handler for embedding spread spectrum watermarks.
+    Lambda handler for embedding Trustmark watermarks.
 
     Args:
         event: Lambda event, can be from API Gateway or Step Functions
@@ -124,7 +126,7 @@ def handler(
                 "statusCode": 200,
                 "body": json.dumps(
                     {
-                        "message": "Spread spectrum watermark handler (Python version)",
+                        "message": "Trustmark watermark handler (Python version)",
                         "available_methods": ["embed", "extract"],
                         "libraries": ["blind-watermark", "PIL", "numpy"],
                     }
@@ -178,6 +180,14 @@ def handler(
 
         # Process the watermarking request
         if action == "embed":
+            if not watermark_data:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps(
+                        {"error": "Missing required parameter: watermarkData"}
+                    ),
+                    "headers": {"Content-Type": "application/json"},
+                }
             return embed_spectrum_watermark(bucket_name, key, watermark_data, event)
         elif action == "extract":
             return extract_spectrum_watermark(bucket_name, key)
@@ -212,6 +222,47 @@ def handler(
         }
 
 
+def embed_watermark_to_image_data(image_data: bytes, nano_id: str) -> bytes:
+    """
+    Embeds a nanoid as a watermark into image data using trustmark.
+
+    Args:
+        image_data: Binary image data.
+        nano_id: The nanoid to embed.
+
+    Returns:
+        Binary image data with the watermark embedded.
+    """
+    logger.info(f"Embedding watermark into image data of size: {len(image_data)} bytes")
+    logger.info(f"nanoid to embed: {nano_id}")
+
+    try:
+        # Load image from bytes
+        cover = Image.open(io.BytesIO(image_data)).convert("RGB")
+
+        # Initialize TrustMark with BCH_5 encoding for nanoid (8 characters)
+        tm = TrustMark(verbose=False, model_type="P", encoding_type=1)
+
+        # nanoidを直接使用（BCH_5の8文字制限内）
+        encoded_id = nano_id
+        logger.info(f"Using nanoid {nano_id} for watermark")
+
+        # Embed watermark
+        watermarked_image = tm.encode(cover, encoded_id)
+
+        # Convert back to bytes
+        with io.BytesIO() as output:
+            watermarked_image.save(output, format="PNG")
+            watermarked_data = output.getvalue()
+
+        logger.info(f"Watermarked image size: {len(watermarked_data)} bytes")
+        return watermarked_data
+
+    except Exception as e:
+        logger.error(f"Error in embed_watermark_to_image_data: {e}", exc_info=True)
+        raise
+
+
 def embed_spectrum_watermark(
     bucket_name: str,
     key: str,
@@ -219,7 +270,7 @@ def embed_spectrum_watermark(
     original_event: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Embed spread spectrum watermark into an image.
+    Embed Trustmark watermark into an image from S3.
 
     Args:
         bucket_name: S3 bucket name
@@ -230,9 +281,7 @@ def embed_spectrum_watermark(
     Returns:
         Response dictionary
     """
-    logger.info(
-        f"Embedding spread spectrum watermark for: bucket={bucket_name}, key={key}"
-    )
+    logger.info(f"Embedding Trustmark watermark for: bucket={bucket_name}, key={key}")
 
     try:
         # Download image from S3
@@ -241,180 +290,63 @@ def embed_spectrum_watermark(
         image_data = response["Body"].read()
         logger.info(f"Downloaded image size: {len(image_data)} bytes")
 
-        # Convert watermark data to string for embedding
-        watermark_text = json.dumps(watermark_data, separators=(",", ":"))
-        logger.info(f"Watermark text to embed: {watermark_text}")
+        # Extract nano ID from watermark data
+        nano_id = watermark_data.get("postId")
+        if not nano_id:
+            raise ValueError("postId not found in watermarkData")
 
-        # Create temporary files
-        with (
-            tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as input_file,
-            tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as output_file,
-        ):
-            try:
-                # Write original image to temporary file
-                input_file.write(image_data)
-                input_file.flush()
-                input_path = input_file.name
-                output_path = output_file.name
+        # Embed watermark using the separated function
+        watermarked_data = embed_watermark_to_image_data(image_data, str(nano_id))
 
-                logger.info(f"Processing image: {input_path} -> {output_path}")
+        # Upload back to S3
+        logger.info("Uploading watermarked image back to S3...")
+        # ContentTypeをimage/pngに固定
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=key,
+            Body=watermarked_data,
+            ContentType="image/png",
+        )
 
-                # Initialize blind watermark
-                bwm = WaterMark(password_img=1, password_wm=1)
+        logger.info("Watermark embedding completed successfully")
 
-                # Embed watermark
-                logger.info("Embedding watermark using blind-watermark library...")
-                bwm.read_img(input_path)
-                bwm.read_wm(watermark_text, mode="str")
-                bwm.embed(output_path)
+        # For Step Functions, return the original event parameters directly
+        if original_event and "postId" in original_event:
+            return {
+                "postId": original_event["postId"],
+                "userId": original_event["userId"],
+                "bucket": original_event.get("bucket")
+                or original_event.get("bucketName"),
+                "timestamp": original_event.get("timestamp", ""),
+                "hasSpectrumWatermarkedImage": True,
+                "message": "Watermark embedded successfully",
+                "method": "trustmark",
+                "size": len(watermarked_data),
+            }
 
-                # Read the watermarked image
-                with open(output_path, "rb") as f:
-                    watermarked_data = f.read()
-
-                logger.info(f"Watermarked image size: {len(watermarked_data)} bytes")
-
-                # Upload back to S3
-                logger.info("Uploading watermarked image back to S3...")
-                s3_client.put_object(
-                    Bucket=bucket_name,
-                    Key=key,
-                    Body=watermarked_data,
-                    ContentType=get_content_type(key),
-                )
-
-                logger.info("Watermark embedding completed successfully")
-
-                # For Step Functions, return the original event parameters directly
-                if original_event and "postId" in original_event:
-                    return {
-                        "postId": original_event["postId"],
-                        "userId": original_event["userId"],
-                        "bucket": original_event.get("bucket")
-                        or original_event.get("bucketName"),
-                        "timestamp": original_event.get("timestamp", ""),
-                        "hasSpectrumWatermarkedImage": True,
-                        "message": "Spread spectrum watermark embedded successfully (Python)",
-                        "method": "spread_spectrum_python",
-                        "size": len(watermarked_data),
-                    }
-
-                # Return appropriate response for API Gateway
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(
-                        {
-                            "message": "Spread spectrum watermark embedded successfully (Python)",
-                            "method": "spread_spectrum_python",
-                            "size": len(watermarked_data),
-                        }
-                    ),
-                    "headers": {
-                        "Content-Type": "application/json",
-                    },
+        # Return appropriate response for API Gateway
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "message": "Trustmark watermark embedded successfully",
+                    "method": "trustmark",
+                    "size": len(watermarked_data),
                 }
-
-            finally:
-                # Clean up temporary files
-                try:
-                    os.unlink(input_path)
-                    os.unlink(output_path)
-                except OSError:
-                    pass
+            ),
+            "headers": {
+                "Content-Type": "application/json",
+            },
+        }
 
     except Exception as error:
         logger.error(f"Error in embed_spectrum_watermark: {error}", exc_info=True)
         raise Exception(f"Failed to embed watermark: {str(error)}")
 
 
-def extract_spectrum_watermark(bucket_name: str, key: str) -> Dict[str, Any]:
+def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
     """
-    Extract spread spectrum watermark from an image.
-
-    Args:
-        bucket_name: S3 bucket name
-        key: S3 object key
-
-    Returns:
-        Response dictionary with extracted watermark data
-    """
-    logger.info(
-        f"Extracting spread spectrum watermark from: bucket={bucket_name}, key={key}"
-    )
-
-    try:
-        # Download image from S3
-        logger.info("Downloading image from S3...")
-        response = s3_client.get_object(Bucket=bucket_name, Key=key)
-        image_data = response["Body"].read()
-        logger.info(f"Downloaded image size: {len(image_data)} bytes")
-
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
-            try:
-                # Write image to temporary file
-                temp_file.write(image_data)
-                temp_file.flush()
-                temp_path = temp_file.name
-
-                logger.info(f"Extracting watermark from: {temp_path}")
-
-                # Initialize blind watermark for extraction
-                bwm = WaterMark(password_img=1, password_wm=1)
-
-                # Extract watermark
-                logger.info("Extracting watermark using blind-watermark library...")
-                extracted_text = bwm.extract(temp_path, wm_shape=1000, mode="str")
-
-                # Try to parse the extracted text as JSON
-                extracted_data = None
-                try:
-                    # Clean up the extracted text (remove null characters and whitespace)
-                    cleaned_text = extracted_text.strip("\x00").strip()
-                    if cleaned_text:
-                        extracted_data = json.loads(cleaned_text)
-                        logger.info(
-                            f"Successfully extracted watermark data: {extracted_data}"
-                        )
-                    else:
-                        logger.warning("Extracted text is empty after cleaning")
-                except json.JSONDecodeError:
-                    logger.warning(
-                        f"Could not parse extracted text as JSON: {repr(extracted_text[:100])}"
-                    )
-
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps(
-                        {
-                            "message": "Spread spectrum watermark extraction completed (Python)",
-                            "method": "spread_spectrum_python",
-                            "watermarkData": extracted_data,
-                            "rawExtractedText": extracted_text[:500]
-                            if extracted_text
-                            else None,  # Truncate for safety
-                        }
-                    ),
-                    "headers": {
-                        "Content-Type": "application/json",
-                    },
-                }
-
-            finally:
-                # Clean up temporary file
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
-
-    except Exception as error:
-        logger.error(f"Error in extract_spectrum_watermark: {error}", exc_info=True)
-        raise Exception(f"Failed to extract watermark: {str(error)}")
-
-
-def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
-    """
-    Extract Snowflake ID from watermarked image.
+    Extract Nano ID from watermarked image using trustmark.
 
     Args:
         image_data: Binary image data
@@ -423,68 +355,36 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
         Dictionary with extracted ID, method, and confidence
     """
     logger.info(
-        f"Extracting Snowflake ID from watermark, image size: {len(image_data)} bytes"
+        f"Extracting Nano ID from watermark, image size: {len(image_data)} bytes"
     )
+    nano_id = None
+    confidence = 0.0
 
     try:
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
-            try:
-                # Write image to temporary file
-                temp_file.write(image_data)
-                temp_file.flush()
-                temp_path = temp_file.name
+        # Load image from bytes
+        cover = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-                logger.info(f"Extracting Snowflake ID from: {temp_path}")
+        # Initialize TrustMark with BCH_5 encoding for nanoid (8 characters)
+        tm = TrustMark(verbose=False, model_type="P", encoding_type=1)
 
-                # Initialize blind watermark for extraction
-                bwm = WaterMark(password_img=1, password_wm=1)
+        # Decode watermark
+        wm_secret, wm_present, wm_schema = tm.decode(cover)
 
-                # Extract watermark
-                logger.info("Extracting watermark using blind-watermark library...")
-                extracted_text = bwm.extract(temp_path, wm_shape=1000, mode="str")
+        if wm_present and wm_secret:
+            extracted_secret = wm_secret.strip()
 
-                # Try to parse the extracted text as JSON and get postId
-                snowflake_id = None
-                confidence = 0.0
+            nano_id = extracted_secret
 
-                try:
-                    # Clean up the extracted text
-                    cleaned_text = extracted_text.strip("\x00").strip()
-                    if cleaned_text:
-                        extracted_data = json.loads(cleaned_text)
-                        if "postId" in extracted_data:
-                            snowflake_id = str(extracted_data["postId"])
-                            confidence = 0.95
-                            logger.info(
-                                f"Successfully extracted Snowflake ID: {snowflake_id}"
-                            )
-                        else:
-                            logger.warning(
-                                "No postId found in extracted watermark data"
-                            )
-                    else:
-                        logger.warning("Extracted text is empty after cleaning")
-                except json.JSONDecodeError:
-                    logger.warning(
-                        f"Could not parse extracted text as JSON: {repr(extracted_text[:100])}"
-                    )
-
-                return {
-                    "extractedId": snowflake_id,
-                    "method": "spread_spectrum_python",
-                    "confidence": confidence,
-                }
-
-            finally:
-                # Clean up temporary file
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
+            confidence = 0.95  # High confidence
+            logger.info(f"Successfully extracted nanoid: {nano_id}")
+        else:
+            logger.warning("No watermark detected or extracted text is empty")
 
     except Exception as error:
-        logger.error(
-            f"Error in extract_snowflake_id_from_watermark: {error}", exc_info=True
-        )
-        raise Exception(f"Failed to extract Snowflake ID: {str(error)}")
+        logger.error(f"Error in extract_nano_id_from_watermark: {error}", exc_info=True)
+
+    return {
+        "extractedId": nano_id,
+        "method": "trustmark_P_BCH5",
+        "confidence": confidence,
+    }

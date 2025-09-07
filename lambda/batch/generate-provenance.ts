@@ -152,7 +152,7 @@ export const handler = async (event: any) => {
             <div>
               <h4 class="font-bold">🔒 Spectrum Watermark Protection</h4>
               <div class="text-sm mt-2">
-                <p>This image contains a robust spread-spectrum watermark embedding the Snowflake ID: <span class="font-mono font-bold">${postId}</span></p>
+                <p>This image contains a watermark embedding the Post ID: <span class="font-mono font-bold">${postId}</span></p>
                 <p>The watermark is resistant to compression, resizing, and other image manipulations.</p>
                 ${event.watermarkData ? `
                 <div class="collapse collapse-arrow bg-base-200 mt-4">
@@ -162,7 +162,7 @@ export const handler = async (event: any) => {
                   </div>
                   <div class="collapse-content">
                     <ul class="list-disc list-inside space-y-1">
-                      <li><strong>Watermark Method:</strong> ${event.watermarkData.method || 'Spread Spectrum'}</li>
+                      <li><strong>Watermark Method:</strong> ${event.watermarkData.method || 'Trustmark'}</li>
                       <li><strong>Sequence Length:</strong> ${event.watermarkData.length || 'N/A'}</li>
                       <li><strong>Embedded At:</strong> ${event.watermarkData.generatedAt ? new Date(event.watermarkData.generatedAt).toLocaleString() : 'N/A'}</li>
                       <li><strong>Post ID Encoded:</strong> ${event.watermarkData.postId}</li>

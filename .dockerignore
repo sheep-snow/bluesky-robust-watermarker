@@ -26,3 +26,4 @@ cdk.out/
 .vscode/
 .unittest_results.xml
 node_modules/
+tests/assets

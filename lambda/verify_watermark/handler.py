@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import logging
 import os
@@ -6,7 +7,8 @@ import tempfile
 from typing import Any, Dict, Optional
 
 import boto3
-from blind_watermark import WaterMark
+from PIL import Image
+from trustmark import TrustMark
 
 # アプリ名を環境変数から取得
 APP_NAME = os.environ.get("APP_NAME", "brw")
@@ -77,9 +79,9 @@ def get_file_extension_from_signature(image_data: bytes) -> str:
         return ".jpg"
 
 
-def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
+def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
     """
-    Extract Snowflake ID from watermarked image using blind-watermark library.
+    Extract Nano ID from watermarked image using trustmark.
 
     Args:
         image_data: Binary image data
@@ -88,81 +90,43 @@ def extract_snowflake_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
         Dictionary with extracted ID, method, and confidence
     """
     logger.info(
-        "Extracting Snowflake ID from watermark, image size: %d bytes", len(image_data)
+        "Extracting Nano ID from watermark, image size: %d bytes", len(image_data)
     )
+    nano_id = None
+    confidence = 0.0
 
     try:
-        # Detect the proper file extension
-        file_extension = get_file_extension_from_signature(image_data)
+        # Load image from bytes
+        cover = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-        # Create temporary file with proper extension
-        with tempfile.NamedTemporaryFile(
-            suffix=file_extension, delete=False
-        ) as temp_file:
-            try:
-                # Write image to temporary file
-                temp_file.write(image_data)
-                temp_file.flush()
-                temp_path = temp_file.name
+        # Initialize TrustMark with BCH_5 encoding for nanoid (8 characters)
+        tm = TrustMark(verbose=False, model_type="P", encoding_type=1)
 
-                logger.info("Extracting Snowflake ID from: %s", temp_path)
+        # Decode watermark
+        wm_secret, wm_present, wm_schema = tm.decode(cover)
 
-                # Initialize blind watermark for extraction
-                bwm = WaterMark(password_img=1, password_wm=1)
+        if wm_present and wm_secret:
+            extracted_secret = wm_secret.strip()
 
-                # Extract watermark
-                logger.info("Extracting watermark using blind-watermark library...")
-                extracted_text = bwm.extract(temp_path, wm_shape=1000, mode="str")
+            # For now, just use the extracted secret as-is
+            # In a real implementation, you'd need to store the full ID mapping elsewhere
+            nano_id = extracted_secret
 
-                # Try to parse the extracted text as JSON and get postId
-                snowflake_id = None
-                confidence = 0.0
-
-                try:
-                    # Clean up the extracted text
-                    cleaned_text = extracted_text.strip("\x00").strip()
-                    if cleaned_text:
-                        extracted_data = json.loads(cleaned_text)
-                        if "postId" in extracted_data:
-                            snowflake_id = str(extracted_data["postId"])
-                            confidence = 0.95
-                            logger.info(
-                                "Successfully extracted Snowflake ID: %s", snowflake_id
-                            )
-                        else:
-                            logger.warning(
-                                "No postId found in extracted watermark data"
-                            )
-                    else:
-                        logger.warning("Extracted text is empty after cleaning")
-                except json.JSONDecodeError:
-                    logger.warning(
-                        "Could not parse extracted text as JSON: %s",
-                        repr(extracted_text[:100]),
-                    )
-
-                return {
-                    "extractedId": snowflake_id,
-                    "method": "spread_spectrum_python",
-                    "confidence": confidence,
-                }
-
-            finally:
-                # Clean up temporary file
-                try:
-                    os.unlink(temp_path)
-                except OSError:
-                    pass
+            confidence = 0.95  # High confidence
+            logger.info("Successfully extracted Nano ID: %s", nano_id)
+        else:
+            logger.warning("No watermark detected or extracted text is empty")
 
     except Exception as error:
         logger.error(
-            "Error in extract_snowflake_id_from_watermark: %s", error, exc_info=True
+            "Error in extract_nano_id_from_watermark: %s", error, exc_info=True
         )
-        return {
-            "extractedId": None,
-            "method": "spread_spectrum_python",
-            "confidence": 0.0,
-        }
+
+    return {
+        "extractedId": nano_id,
+        "method": "trustmark_P_BCH5",
+        "confidence": confidence,
+    }
 
 
 def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[bytes]:
@@ -686,11 +650,11 @@ def generate_no_provenance_page(post_id: str, extraction_result: Dict[str, Any])
     <div class="container">
         <div class="info-icon">🔍</div>
         <h1>来歴データが見つかりません</h1>
-        <p>透かしからSnowflake IDは検出されましたが、対応する来歴データが見つかりませんでした。</p>
+        <p>透かしから投稿IDは検出されましたが、対応する来歴データが見つかりませんでした。</p>
         
         <div class="details">
             <h3>検出情報</h3>
-            <p><strong>検出されたID:</strong> <span class="post-id">{post_id}</span></p>
+            <p><strong>検出された投稿ID:</strong> <span class="post-id">{post_id}</span></p>
             <p><strong>検証方法:</strong> {extraction_result.get("method", "不明")}</p>
             <p><strong>信頼度:</strong> {(extraction_result.get("confidence", 0) * 100):.1f}%</p>
             <p><strong>可能な原因:</strong></p>
@@ -750,8 +714,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
             logger.info("Processing uploaded image (%d bytes)", len(image_data))
 
-            # Extract Snowflake ID from watermark using Python version
-            extraction_result = extract_snowflake_id_from_watermark(image_data)
+            # Extract Nano ID from watermark using Python version
+            extraction_result = extract_nano_id_from_watermark(image_data)
 
             if not extraction_result.get("extractedId"):
                 return get_html_response(generate_no_watermark_page(extraction_result))
