@@ -22,7 +22,7 @@ BlueskyのようなSNSプラットフォームでは、デジタルアートや�
 - [Node.js](https://nodejs.org/ja/download) 18以上
 - [AWS CDK](https://docs.aws.amazon.com/ja_jp/cdk/v2/guide/getting-started.html) (`npm install -g aws-cdk`)
 - [Route53 HostedZone](https://docs.aws.amazon.com/ja_jp/Route53/latest/DeveloperGuide/domain-register-update.html) で管理されているカスタムドメイン (NS, SOAレコードがあること)
-- Python 3.10.x
+- Python 3.12.x
   - [Poetry](https://python-poetry.org/)
 - [Docker Service](https://docs.docker.com/engine/install/)
 - Google OAuth 2.0 クライアントが設定済み（下記手順参照）
