@@ -1,46 +1,57 @@
-# https://github.com/aws/aws-lambda-python-runtime-interface-client
-
-# Define custom function directory
+# Ubuntu-based Lambda runtime with PyTorch CPU support
 ARG FUNCTION_DIR="/function"
 
-FROM public.ecr.aws/docker/library/python:3.12-alpine as build-image
+# Build stage
+FROM public.ecr.aws/docker/library/python:3.12-slim-bookworm as build-image
 
-# Include global arg in this stage of the build
 ARG FUNCTION_DIR
 
-# https://blog.whoelsebut.me/inexpensive-receipt-repository-ocr
-# Install aws-lambda-cpp build dependencies
-RUN apk update && \
-    apk add --no-cache build-base \
-    jpeg-dev \
-    zlib-dev \
-    cmake \
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y \
     g++ \
     make \
+    cmake \
     unzip \
-    curl-dev \
-    autoconf \
-    automake \
-    libtool \
-    linux-headers \
-    musl-dev
+    libcurl4-openssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install the function's dependencies
-# Skip awslambdaric for now and use alternative approach
-RUN pip install --target ${FUNCTION_DIR} mangum fastapi
+# Install AWS Lambda runtime interface client
+RUN pip install \
+    --target ${FUNCTION_DIR} \
+    awslambdaric
 
+# Runtime stage
+FROM public.ecr.aws/docker/library/python:3.12-slim-bookworm
 
-FROM public.ecr.aws/docker/library/python:3.12-alpine
-
-# Include global arg in this stage of the build
 ARG FUNCTION_DIR
-# Set working directory to function root directory
 WORKDIR ${FUNCTION_DIR}
-# Copy in the built dependencies
+
+# Copy Lambda runtime from build stage
 COPY --from=build-image ${FUNCTION_DIR} ${FUNCTION_DIR}
 
-# Install system dependencies
-RUN apk update && apk add --no-cache mesa-gl libgomp opencv git curl unzip
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    libgl1-mesa-glx \
+    libgomp1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libfontconfig1 \
+    git \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+# Install AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws \
+    && aws --version
+
+ENV PYTHONUTF8=1
 
 # Copy Python dependency files
 COPY pyproject.toml poetry.toml poetry.lock ${FUNCTION_DIR}/
@@ -48,12 +59,11 @@ COPY pyproject.toml poetry.toml poetry.lock ${FUNCTION_DIR}/
 # Install Python dependencies using poetry
 RUN pip install --upgrade pip \
     && pip install poetry \
-    && poetry config virtualenvs.create false
-# && poetry config installer.parallel false
-RUN poetry install --no-root --only main --no-dev || \
-    (pip install boto3 pillow && echo "Fallback to pip install")
+    && poetry config virtualenvs.create false \
+    && poetry config installer.parallel false \
+    && poetry install --no-root --only main
 
 # Copy Lambda function code
 COPY lambda/ ${FUNCTION_DIR}/lambda/
 
-ENTRYPOINT [ "/usr/local/bin/python" ]
+ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]

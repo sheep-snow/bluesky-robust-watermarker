@@ -11,8 +11,8 @@ package-mode = false
 python = "^3.12"
 boto3 = "^1.40.26"
 pillow = "^11.3.0"
-torch = "2.2.2+cpu"
-torchvision = "0.17.2+cpu"
+torch = {version = "^2.2.0", source = "pytorch-cpu"}
+torchvision = {version = "^0.17.0", source = "pytorch-cpu"}
 trustmark = "^0.8.0"
 
 [[tool.poetry.source]]
