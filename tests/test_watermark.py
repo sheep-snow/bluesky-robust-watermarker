@@ -34,7 +34,7 @@ def test_embed_and_extract_watermark(image_path):
     Test B: extract_nano_id_from_watermark
     """
     # 動的インポートでSyntaxErrorを回避
-    embed_module = importlib.import_module("lambda.batch.embed_spectrum_watermark")
+    embed_module = importlib.import_module("lambda.batch.embed_watermark")
     embed_watermark_to_image_data = embed_module.embed_watermark_to_image_data
     verify_module = importlib.import_module("lambda.verify_watermark.handler")
     extract_nano_id_from_watermark = verify_module.extract_nano_id_from_watermark

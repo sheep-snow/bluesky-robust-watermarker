@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import boto3
 from PIL import Image
-from trustmark import TrustMark
+# from trustmark import TrustMark  # Temporarily disabled
 
 # アプリ名を環境変数から取得
 APP_NAME = os.environ.get("APP_NAME", "brw")
@@ -99,23 +99,11 @@ def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
         # Load image from bytes
         cover = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-        # Initialize TrustMark with BCH_5 encoding for nanoid (8 characters)
-        tm = TrustMark(verbose=False, model_type="P", encoding_type=1)
-
-        # Decode watermark
-        wm_secret, wm_present, wm_schema = tm.decode(cover)
-
-        if wm_present and wm_secret:
-            extracted_secret = wm_secret.strip()
-
-            # For now, just use the extracted secret as-is
-            # In a real implementation, you'd need to store the full ID mapping elsewhere
-            nano_id = extracted_secret
-
-            confidence = 0.95  # High confidence
-            logger.info("Successfully extracted Nano ID: %s", nano_id)
-        else:
-            logger.warning("No watermark detected or extracted text is empty")
+        # Temporarily disabled trustmark functionality
+        logger.warning("TrustMark functionality temporarily disabled")
+        
+        # Return no watermark found for now
+        logger.warning("No watermark detected (functionality disabled)")
 
     except Exception as error:
         logger.error(

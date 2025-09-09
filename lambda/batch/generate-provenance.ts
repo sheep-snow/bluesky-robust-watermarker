@@ -139,18 +139,18 @@ export const handler = async (event: any) => {
       </div>
       ` : ''}
     
-      ${event.hasSpectrumWatermarkedImage || event.hasProcessedImage ? `
+      ${event.hasWatermarkedImage || event.hasProcessedImage ? `
       <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
           <h3 class="card-title text-xl text-primary">🖼️ Verified Image</h3>
           <div class="text-center">
             <img src="/provenance/${postId}/image.${postData.imageExtension || 'jpg'}" alt="Post image" class="max-w-full h-auto rounded-lg shadow-md" />
           </div>
-          ${event.hasSpectrumWatermarkedImage ? `
+          ${event.hasWatermarkedImage ? `
           <div class="alert alert-success mt-6">
             <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <div>
-              <h4 class="font-bold">🔒 Spectrum Watermark Protection</h4>
+              <h4 class="font-bold">🔒 Watermark Protection</h4>
               <div class="text-sm mt-2">
                 <p>This image contains a watermark embedding the Post ID: <span class="font-mono font-bold">${postId}</span></p>
                 <p>The watermark is resistant to compression, resizing, and other image manipulations.</p>
@@ -187,7 +187,7 @@ export const handler = async (event: any) => {
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </div>
               <div class="stat-title">Watermark</div>
-              <div class="stat-value text-primary">${event.spectrumWatermarkEmbedded || event.trustMarkEmbedded ? 'Embedded' : 'Not Embedded'}</div>
+              <div class="stat-value text-primary">${event.WatermarkEmbedded || event.trustMarkEmbedded ? 'Embedded' : 'Not Embedded'}</div>
             </div>
             <div class="stat">
               <div class="stat-figure text-secondary">

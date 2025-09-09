@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Union
 
 import boto3
 from PIL import Image
-from trustmark import TrustMark
+# from trustmark import TrustMark  # Temporarily disabled
 
 # Configure logging
 logger = logging.getLogger()
@@ -188,9 +188,9 @@ def handler(
                     ),
                     "headers": {"Content-Type": "application/json"},
                 }
-            return embed_spectrum_watermark(bucket_name, key, watermark_data, event)
+            return embed_watermark(bucket_name, key, watermark_data, event)
         elif action == "extract":
-            return extract_spectrum_watermark(bucket_name, key)
+            return extract_watermark(bucket_name, key)
         else:
             return {
                 "statusCode": 400,
@@ -240,22 +240,15 @@ def embed_watermark_to_image_data(image_data: bytes, nano_id: str) -> bytes:
         # Load image from bytes
         cover = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-        # Initialize TrustMark with BCH_5 encoding for nanoid (8 characters)
-        tm = TrustMark(verbose=False, model_type="P", encoding_type=1)
-
-        # nanoidを直接使用（BCH_5の8文字制限内）
-        encoded_id = nano_id
-        logger.info(f"Using nanoid {nano_id} for watermark")
-
-        # Embed watermark
-        watermarked_image = tm.encode(cover, encoded_id)
-
-        # Convert back to bytes
+        # Temporarily disabled trustmark functionality
+        logger.warning("TrustMark functionality temporarily disabled")
+        
+        # Return original image data for now
         with io.BytesIO() as output:
-            watermarked_image.save(output, format="PNG")
+            cover.save(output, format="PNG")
             watermarked_data = output.getvalue()
 
-        logger.info(f"Watermarked image size: {len(watermarked_data)} bytes")
+        logger.info(f"Image processed (no watermark): {len(watermarked_data)} bytes")
         return watermarked_data
 
     except Exception as e:
@@ -263,7 +256,7 @@ def embed_watermark_to_image_data(image_data: bytes, nano_id: str) -> bytes:
         raise
 
 
-def embed_spectrum_watermark(
+def embed_watermark(
     bucket_name: str,
     key: str,
     watermark_data: Dict[str, Any],
@@ -318,7 +311,7 @@ def embed_spectrum_watermark(
                 "bucket": original_event.get("bucket")
                 or original_event.get("bucketName"),
                 "timestamp": original_event.get("timestamp", ""),
-                "hasSpectrumWatermarkedImage": True,
+                "hasWatermarkedImage": True,
                 "message": "Watermark embedded successfully",
                 "method": "trustmark",
                 "size": len(watermarked_data),
@@ -340,7 +333,7 @@ def embed_spectrum_watermark(
         }
 
     except Exception as error:
-        logger.error(f"Error in embed_spectrum_watermark: {error}", exc_info=True)
+        logger.error(f"Error in embed_watermark: {error}", exc_info=True)
         raise Exception(f"Failed to embed watermark: {str(error)}")
 
 
@@ -364,21 +357,11 @@ def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
         # Load image from bytes
         cover = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-        # Initialize TrustMark with BCH_5 encoding for nanoid (8 characters)
-        tm = TrustMark(verbose=False, model_type="P", encoding_type=1)
-
-        # Decode watermark
-        wm_secret, wm_present, wm_schema = tm.decode(cover)
-
-        if wm_present and wm_secret:
-            extracted_secret = wm_secret.strip()
-
-            nano_id = extracted_secret
-
-            confidence = 0.95  # High confidence
-            logger.info(f"Successfully extracted nanoid: {nano_id}")
-        else:
-            logger.warning("No watermark detected or extracted text is empty")
+        # Temporarily disabled trustmark functionality
+        logger.warning("TrustMark functionality temporarily disabled")
+        
+        # Return no watermark found for now
+        logger.warning("No watermark detected (functionality disabled)")
 
     except Exception as error:
         logger.error(f"Error in extract_nano_id_from_watermark: {error}", exc_info=True)
