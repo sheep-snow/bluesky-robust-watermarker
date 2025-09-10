@@ -63,6 +63,10 @@ RUN pip install --upgrade pip \
     && poetry config installer.parallel false \
     && poetry install --no-root --only main
 
+# Copy and run TrustMark model download script
+COPY download_trustmark_models.py ${FUNCTION_DIR}/
+RUN mkdir -p /tmp/trustmark_models && python3 ${FUNCTION_DIR}/download_trustmark_models.py
+
 # Copy Lambda function code
 COPY lambda/ ${FUNCTION_DIR}/lambda/
 

@@ -38,37 +38,77 @@ def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
         try:
             from trustmark import TrustMark
 
-            # Create a TrustMark instance
-            tm = TrustMark()
+            # Set up writable directories for TrustMark in Lambda environment
+            os.environ["TRUSTMARK_CACHE_DIR"] = "/tmp/trustmark_models"
+            os.environ["HOME"] = "/tmp"  # Some libraries use HOME for cache
+            os.makedirs("/tmp/trustmark_models", exist_ok=True)
+
+            # Try to copy existing models if available
+            import shutil
+
+            models_source = "/usr/local/lib/python3.12/site-packages/trustmark/models"
+            if os.path.exists(models_source):
+                try:
+                    shutil.copytree(
+                        models_source, "/tmp/trustmark_models", dirs_exist_ok=True
+                    )
+                    logger.info("Copied existing TrustMark models to writable location")
+                except Exception as copy_error:
+                    logger.warning(f"Could not copy models: {copy_error}")
+
+            # Create a TrustMark instance with error handling
+            try:
+                tm = TrustMark()
+                logger.info("TrustMark initialized successfully")
+            except OSError as os_error:
+                if "Read-only file system" in str(os_error):
+                    logger.error(
+                        "TrustMark failed due to read-only filesystem. Models need to be pre-downloaded."
+                    )
+                    raise Exception(
+                        "TrustMark initialization failed - models not available in read-only environment"
+                    )
+                else:
+                    raise
 
             # Extract the watermark using trustmark's API
             logger.info("Extracting watermark using TrustMark...")
-            # Based on common trustmark API patterns, try different method names
-            extracted_data = None
-            if hasattr(tm, "extract"):
-                extracted_data = tm.extract(cover)
-            elif hasattr(tm, "decode"):
-                extracted_data = tm.decode(cover)
-            elif hasattr(tm, "detect"):
-                extracted_data = tm.detect(cover)
-            else:
-                # If method not found, log available methods for debugging
-                available_methods = [
-                    method for method in dir(tm) if not method.startswith("_")
-                ]
-                logger.warning(f"TrustMark available methods: {available_methods}")
-                raise AttributeError("TrustMark extraction method not found")
+            # Use the correct TrustMark API method
+            extracted_data = tm.decode(cover, MODE="text")
 
-            if extracted_data and isinstance(extracted_data, dict):
-                nano_id = extracted_data.get("message", "").strip()
-                confidence = float(extracted_data.get("confidence", 0.0))
-                logger.info(f"Extracted nano_id: {nano_id}, confidence: {confidence}")
+            # TrustMark decode returns a tuple: (message, success_flag, confidence)
+            if (
+                extracted_data
+                and isinstance(extracted_data, tuple)
+                and len(extracted_data) >= 2
+            ):
+                nano_id = extracted_data[0].strip() if extracted_data[0] else None
+                success_flag = extracted_data[1] if len(extracted_data) > 1 else False
+                confidence = (
+                    float(extracted_data[2]) if len(extracted_data) > 2 else 1.0
+                )
+
+                if success_flag and nano_id:
+                    logger.info(
+                        f"Extracted nano_id: {nano_id}, confidence: {confidence}"
+                    )
+                else:
+                    logger.warning(
+                        f"TrustMark extraction failed: success={success_flag}, message={nano_id}"
+                    )
+                    nano_id = None
+                    confidence = 0.0
             elif extracted_data and isinstance(extracted_data, str):
+                # Fallback for string response
                 nano_id = extracted_data.strip()
-                confidence = 1.0  # Assume high confidence if string returned
-                logger.info(f"Extracted nano_id: {nano_id}")
+                confidence = 1.0
+                logger.info(f"Extracted nano_id (string): {nano_id}")
             else:
-                logger.warning("No watermark detected by TrustMark")
+                logger.warning(
+                    f"No watermark detected by TrustMark, response: {extracted_data}"
+                )
+                nano_id = None
+                confidence = 0.0
 
         except ImportError:
             logger.warning("TrustMark not available for extraction")
@@ -105,25 +145,46 @@ def embed_watermark_to_image_data(image_data: bytes, nano_id: str) -> bytes:
         try:
             from trustmark import TrustMark
 
-            # Create a TrustMark instance
-            tm = TrustMark()
+            # Set up writable directories for TrustMark in Lambda environment
+            os.environ["TRUSTMARK_CACHE_DIR"] = "/tmp/trustmark_models"
+            os.environ["HOME"] = "/tmp"  # Some libraries use HOME for cache
+            os.makedirs("/tmp/trustmark_models", exist_ok=True)
+
+            # Try to copy existing models if available
+            import shutil
+
+            models_source = "/usr/local/lib/python3.12/site-packages/trustmark/models"
+            if os.path.exists(models_source):
+                try:
+                    shutil.copytree(
+                        models_source, "/tmp/trustmark_models", dirs_exist_ok=True
+                    )
+                    logger.info("Copied existing TrustMark models to writable location")
+                except Exception as copy_error:
+                    logger.warning(f"Could not copy models: {copy_error}")
+
+            # Create a TrustMark instance with error handling
+            try:
+                tm = TrustMark()
+                logger.info("TrustMark initialized successfully")
+            except OSError as os_error:
+                if "Read-only file system" in str(os_error):
+                    logger.error(
+                        "TrustMark failed due to read-only filesystem. Models need to be pre-downloaded."
+                    )
+                    raise Exception(
+                        "TrustMark initialization failed - models not available in read-only environment"
+                    )
+                else:
+                    raise
 
             # Embed the watermark using trustmark's API
             logger.info("Embedding watermark using TrustMark...")
-            # Based on common trustmark API patterns, try different method names
-            if hasattr(tm, "embed"):
-                watermarked_image = tm.embed(cover, nano_id)
-            elif hasattr(tm, "add_watermark"):
-                watermarked_image = tm.add_watermark(cover, nano_id)
-            elif hasattr(tm, "encode"):
-                watermarked_image = tm.encode(cover, nano_id)
-            else:
-                # If method not found, log available methods for debugging
-                available_methods = [
-                    method for method in dir(tm) if not method.startswith("_")
-                ]
-                logger.warning(f"TrustMark available methods: {available_methods}")
-                raise AttributeError("TrustMark embedding method not found")
+            # Use the correct TrustMark API method
+            watermarked_image = tm.encode(cover, nano_id, MODE="text", WM_STRENGTH=1.0)
+
+            if watermarked_image is None:
+                raise Exception("TrustMark returned None - watermark embedding failed")
 
             # Convert PIL Image to bytes
             with io.BytesIO() as output:
@@ -151,8 +212,8 @@ def embed_watermark_to_image_data(image_data: bytes, nano_id: str) -> bytes:
 def verify_watermark_embedding(
     watermarked_data: bytes,
     expected_nano_id: str,
-    skip_verification: bool = None,
-    min_confidence: float = None,
+    skip_verification: bool = False,
+    min_confidence: float = 0.5,
 ) -> Dict[str, Any]:
     """
     Verify that a watermark was embedded correctly.
@@ -171,25 +232,31 @@ def verify_watermark_embedding(
     """
     logger.info("Verifying watermark embedding...")
 
+    # Check skip verification setting first
+    if skip_verification or os.environ.get("WATERMARK_SKIP_VERIFICATION") == "true":
+        logger.warning(
+            "Watermark verification skipped due to WATERMARK_SKIP_VERIFICATION setting"
+        )
+        return {
+            "extractedId": str(expected_nano_id),
+            "method": "trustmark_P_BCH5",
+            "confidence": 1.0,
+            "verified": True,
+        }
+
     # Extract watermark
     verification_result = extract_nano_id_from_watermark(watermarked_data)
     extracted_id = verification_result.get("extractedId")
     confidence = verification_result.get("confidence", 0.0)
 
-    # Check skip verification setting
-    if skip_verification is None:
-        skip_verification = os.environ.get("WATERMARK_SKIP_VERIFICATION") == "true"
-
-    # For testing/development when TrustMark is not available
-    if not extracted_id and skip_verification:
-        logger.warning(
-            "Watermark verification skipped due to WATERMARK_SKIP_VERIFICATION setting"
-        )
-        extracted_id = str(expected_nano_id)
-        confidence = 1.0
+    # Check if extraction was successful
+    if not extracted_id:
+        error_msg = "Watermark extraction failed: no watermark detected in image"
+        logger.error(error_msg)
+        raise Exception(error_msg)
 
     # Check if the extracted ID matches the embedded ID
-    if not extracted_id or extracted_id.strip() != str(expected_nano_id).strip():
+    if extracted_id.strip() != str(expected_nano_id).strip():
         error_msg = f"Watermark verification failed: expected '{expected_nano_id}', extracted '{extracted_id}'"
         logger.error(error_msg)
         raise Exception(error_msg)

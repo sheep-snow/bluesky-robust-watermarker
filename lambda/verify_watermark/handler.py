@@ -3,6 +3,8 @@ import importlib.util
 import json
 import logging
 import os
+import time
+import uuid
 from typing import Any, Dict, Optional
 
 import boto3
@@ -10,13 +12,196 @@ import boto3
 # アプリ名を環境変数から取得
 APP_NAME = os.environ.get("APP_NAME", "brw")
 DOMAIN_NAME = os.environ.get("DOMAIN_NAME", "brw-example.app")
+CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "")
+VERIFICATION_RESULTS_TABLE = os.environ.get("VERIFICATION_RESULTS_TABLE", "")
+PROVENANCE_PUBLIC_BUCKET_NAME = os.environ.get("PROVENANCE_PUBLIC_BUCKET_NAME", "")
+
+
+# AWS_REGIONは予約変数なのでboto3から動的取得
+def get_region():
+    try:
+        return boto3.Session().region_name or "us-east-1"
+    except Exception:
+        return "us-east-1"
+
 
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Initialize S3 client
+# Initialize AWS clients
 s3_client = boto3.client("s3")
+dynamodb_client = boto3.client("dynamodb")
+
+
+def save_verification_result(
+    verification_id: str,
+    status: str,
+    result_data: Optional[Dict] = None,
+    error_message: Optional[str] = None,
+):
+    """Save verification result to DynamoDB."""
+    try:
+        logger.info(
+            f"Attempting to save verification result for ID: {verification_id}, status: {status}"
+        )
+        logger.info(f"DynamoDB table name: {VERIFICATION_RESULTS_TABLE}")
+
+        item = {
+            "verification_id": {"S": verification_id},
+            "status": {"S": status},
+            "timestamp": {"N": str(int(time.time()))},
+            "ttl": {"N": str(int(time.time()) + 86400)},  # 24 hours TTL
+        }
+
+        if result_data:
+            item["result_data"] = {"S": json.dumps(result_data)}
+            logger.info("Added result_data to item")
+
+        if error_message:
+            item["error_message"] = {"S": error_message}
+            logger.info("Added error_message to item")
+
+        logger.info(f"Putting item to DynamoDB: {item}")
+        dynamodb_client.put_item(TableName=VERIFICATION_RESULTS_TABLE, Item=item)
+        logger.info(f"Successfully saved verification result for ID: {verification_id}")
+    except Exception as e:
+        logger.error(f"Failed to save verification result: {e}", exc_info=True)
+
+
+def process_watermark_async(verification_id: str, image_data: bytes):
+    """Process watermark extraction asynchronously."""
+    logger.info(f"Starting async processing for verification ID: {verification_id}")
+
+    try:
+        # Update status to processing
+        save_verification_result(verification_id, "processing")
+        logger.info(
+            f"Updated status to processing for verification ID: {verification_id}"
+        )
+
+        logger.info(
+            f"Extracting Nano ID from watermark, image size: {len(image_data)} bytes"
+        )
+
+        # Extract Nano ID from watermark using Python version
+        extraction_result = extract_nano_id_from_watermark(image_data)
+
+        logger.info(f"Extraction result: {extraction_result}")
+
+        if not extraction_result.get("extractedId"):
+            result_data = {
+                "has_watermark": False,
+                "extraction_result": extraction_result,
+            }
+            save_verification_result(
+                verification_id, "completed", result_data=result_data
+            )
+            logger.info(f"No watermark found for verification ID: {verification_id}")
+            return
+
+        extracted_id = extraction_result["extractedId"]
+        logger.info(f"Extracted ID: {extracted_id}")
+
+        # Look up provenance data synchronously to avoid asyncio issues
+        try:
+            # Use urllib instead of requests to avoid dependency issues
+            from urllib.request import Request, urlopen
+
+            # Try multiple possible provenance data locations using CloudFront
+            possible_urls = [
+                f"https://{CLOUDFRONT_DOMAIN}/provenance/{extracted_id}/index.html",
+                f"https://{CLOUDFRONT_DOMAIN}/{extracted_id}.json",
+                f"https://{CLOUDFRONT_DOMAIN}/provenance/{extracted_id}.json",
+            ]
+
+            provenance_data = None
+
+            for provenance_url in possible_urls:
+                try:
+                    logger.info(f"Checking provenance data at: {provenance_url}")
+
+                    req = Request(provenance_url)
+                    req.add_header(
+                        "User-Agent", "Mozilla/5.0 (compatible; chronico-verifier)"
+                    )
+
+                    with urlopen(req, timeout=30) as response:
+                        if response.status == 200:
+                            content = response.read().decode("utf-8")
+                            # Check if it's HTML or JSON
+                            if provenance_url.endswith(".html"):
+                                # For HTML files, just mark as found
+                                provenance_data = {
+                                    "type": "html",
+                                    "url": provenance_url,
+                                }
+                                logger.info(
+                                    f"Found HTML provenance data at {provenance_url}"
+                                )
+                                break
+                            else:
+                                # Try to parse as JSON
+                                provenance_data = json.loads(content)
+                                logger.info(
+                                    f"Found JSON provenance data at {provenance_url}"
+                                )
+                                break
+                        else:
+                            logger.info(
+                                f"No data found at {provenance_url} (status: {response.status})"
+                            )
+                except Exception as url_error:
+                    logger.info(f"Failed to fetch from {provenance_url}: {url_error}")
+                    continue
+
+            if not provenance_data:
+                logger.info(
+                    f"No provenance data found at any location for ID: {extracted_id}"
+                )
+
+        except Exception as prov_error:
+            logger.warning(f"Error fetching provenance data: {prov_error}")
+            provenance_data = None
+
+        result_data = {
+            "has_watermark": True,
+            "extracted_id": extracted_id,
+            "extraction_result": extraction_result,
+            "has_provenance": provenance_data is not None,
+        }
+
+        if provenance_data:
+            result_data["provenance_url"] = (
+                f"https://{DOMAIN_NAME}/provenance/{extracted_id}"
+            )
+            result_data["provenance_data"] = provenance_data
+
+        save_verification_result(verification_id, "completed", result_data=result_data)
+        logger.info(
+            f"Completed async processing for verification ID: {verification_id}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error in async processing for verification ID {verification_id}: {e}"
+        )
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception args: {e.args}")
+        import traceback
+
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        try:
+            save_verification_result(verification_id, "error", error_message=str(e))
+            logger.info(f"Saved error status for verification ID: {verification_id}")
+        except Exception as save_error:
+            logger.error(f"Failed to save error status: {save_error}")
+
+    logger.info(
+        f"Async processing function completed for verification ID: {verification_id}"
+    )
+
 
 # Import common watermark utilities using importlib to avoid lambda keyword issues
 watermark_utils_spec = importlib.util.spec_from_file_location(
@@ -116,7 +301,25 @@ def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[byt
 
         logger.info("Parsing multipart with boundary: %s", boundary)
 
-        body_string = body.decode("latin-1")  # Use latin-1 to preserve binary data
+        # Handle body that may have been corrupted by API Gateway
+        body_string: str
+        try:
+            # If body is UTF-8 encoded string data, try to recover
+            if isinstance(body, bytes):
+                # Try to decode as UTF-8 first, then re-encode as latin-1
+                try:
+                    body_string = body.decode("utf-8")
+                    logger.info("Successfully decoded body as UTF-8")
+                except UnicodeDecodeError:
+                    # If UTF-8 fails, try latin-1 directly
+                    body_string = body.decode("latin-1")
+                    logger.info("Successfully decoded body as latin-1")
+            else:
+                body_string = str(body)
+                logger.info("Body is already string")
+        except Exception as decode_error:
+            logger.error(f"Failed to decode body: {decode_error}")
+            return None
 
         # Split by boundary
         parts = body_string.split(f"--{boundary}")
@@ -140,14 +343,36 @@ def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[byt
             if 'name="image"' in headers and "Content-Type: image/" in headers:
                 logger.info("Found image part, content length: %d", len(content))
 
-                # Convert string back to bytes, then remove trailing CRLF if present
-                content_bytes = content.encode("latin-1")
+                # Convert string back to bytes, handling both cases
+                try:
+                    # First try latin-1 encoding to preserve byte values
+                    content_bytes = content.encode("latin-1")
+                    logger.info("Successfully encoded content as latin-1")
+                except UnicodeEncodeError:
+                    # If that fails, the content is already corrupted
+                    # Try to extract what we can
+                    content_bytes = content.encode("utf-8", errors="replace")
+                    logger.warning(
+                        "Content was corrupted, using UTF-8 with replacement"
+                    )
 
                 if len(content_bytes) >= 2 and content_bytes[-2:] == b"\r\n":
                     content_bytes = content_bytes[:-2]
 
                 logger.info("Extracted image data length: %d", len(content_bytes))
-                return content_bytes
+
+                # Validate that this looks like image data
+                if content_bytes.startswith((b"\xff\xd8\xff", b"\x89PNG", b"GIF")):
+                    logger.info("Image data appears to be valid")
+                    return content_bytes
+                else:
+                    logger.warning(
+                        "Image data does not appear to be valid image format"
+                    )
+                    # Log the first few bytes for debugging
+                    logger.warning(f"First 20 bytes: {content_bytes[:20]}")
+                    # Try to return it anyway for debugging
+                    return content_bytes
 
         logger.info("No image field found in multipart data")
         return None
@@ -377,9 +602,36 @@ def generate_upload_form_html() -> str:
                     body: formData
                 }});
 
-                if (response.redirected) {{
+                if (response.headers.get('content-type')?.includes('application/json')) {{
+                    // Handle JSON response (async processing)
+                    const result = await response.json();
+                    if (result.verification_id) {{
+                        // Show processing status and redirect to check page
+                        const statusHtml = `
+                            <div class="alert alert-info">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div>
+                                    <h3 class="font-bold">検証を開始しました</h3>
+                                    <p class="text-sm">検証ID: ${{result.verification_id}}</p>
+                                    <p class="text-sm">処理には1-2分かかります。結果ページに自動で移動します...</p>
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('result').innerHTML = statusHtml;
+                        document.getElementById('result').classList.remove('hidden');
+                        
+                        // Redirect to result page after 3 seconds
+                        setTimeout(() => {{
+                            window.location.href = result.check_url;
+                        }}, 3000);
+                    }}
+                }} else if (response.redirected) {{
+                    // Handle redirect (old behavior - should not happen with async)
                     window.location.href = response.url;
                 }} else {{
+                    // Handle HTML response (error pages)
                     const result = await response.text();
                     document.getElementById('result').innerHTML = result;
                     document.getElementById('result').classList.remove('hidden');
@@ -675,11 +927,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 )
 
             # Parse multipart form data
-            body = event.get("body", "")
+            raw_body = event.get("body", "")
+            logger.info(
+                f"Body type: {type(raw_body)}, isBase64Encoded: {event.get('isBase64Encoded', False)}"
+            )
+
             if event.get("isBase64Encoded", False):
-                body = base64.b64decode(body)
+                body = base64.b64decode(raw_body)
+                logger.info(f"Decoded base64 body length: {len(body)}")
             else:
-                body = body.encode("utf-8")
+                # Body is already a string from API Gateway
+                if isinstance(raw_body, str):
+                    # API Gateway may have already decoded the body incorrectly
+                    # Try to get raw bytes by re-encoding with ISO-8859-1 which preserves byte values
+                    try:
+                        body = raw_body.encode("iso-8859-1")
+                        logger.info(f"Encoded body length with iso-8859-1: {len(body)}")
+                    except UnicodeEncodeError as e:
+                        logger.error(f"Failed to encode body with iso-8859-1: {e}")
+                        # Fallback: encode as UTF-8 with error handling
+                        body = raw_body.encode("utf-8", errors="replace")
+                        logger.info(
+                            f"Encoded body length with utf-8 (fallback): {len(body)}"
+                        )
+                else:
+                    body = raw_body
+                    logger.info(f"Body is already bytes, length: {len(body)}")
 
             image_data = extract_image_from_multipart(body, content_type)
 
@@ -691,31 +964,41 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
             logger.info("Processing uploaded image (%d bytes)", len(image_data))
 
-            # Extract Nano ID from watermark using Python version
-            extraction_result = extract_nano_id_from_watermark(image_data)
+            # Generate verification ID
+            verification_id = str(uuid.uuid4())
+            logger.info(f"Generated verification ID: {verification_id}")
 
-            if not extraction_result.get("extractedId"):
-                return get_html_response(generate_no_watermark_page(extraction_result))
-
-            # Look up provenance data
-            import asyncio
-
-            provenance_data = asyncio.run(
-                get_provenance_data(extraction_result["extractedId"])
+            # Save initial status to DynamoDB
+            logger.info(
+                f"Saving initial status to DynamoDB table: {VERIFICATION_RESULTS_TABLE}"
             )
+            save_verification_result(verification_id, "started")
 
-            if not provenance_data:
-                return get_html_response(
-                    generate_no_provenance_page(
-                        extraction_result["extractedId"], extraction_result
-                    )
-                )
+            # Process watermark synchronously (with 15 minute timeout)
+            logger.info("Starting synchronous watermark processing")
+            try:
+                process_watermark_async(verification_id, image_data)
+                logger.info("Watermark processing completed successfully")
 
-            # Redirect to provenance page
-            provenance_url = (
-                f"https://{DOMAIN_NAME}/provenance/{extraction_result['extractedId']}"
-            )
-            return get_redirect_response(provenance_url)
+                # Return immediate response with verification ID
+                response_data = {
+                    "verification_id": verification_id,
+                    "status": "completed",
+                    "message": "透かし検証が完了しました。結果確認はcheck-resultエンドポイントをご利用ください。",
+                    "check_url": f"https://{DOMAIN_NAME}/check-result?id={verification_id}",
+                }
+
+            except Exception as processing_error:
+                logger.error(f"Error during watermark processing: {processing_error}")
+                response_data = {
+                    "verification_id": verification_id,
+                    "status": "error",
+                    "message": "透かし検証中にエラーが発生しました。結果確認はcheck-resultエンドポイントをご利用ください。",
+                    "check_url": f"https://{DOMAIN_NAME}/check-result?id={verification_id}",
+                }
+
+            logger.info(f"Returning JSON response: {response_data}")
+            return get_json_response(response_data)
 
         else:
             return get_html_response(

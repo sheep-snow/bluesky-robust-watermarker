@@ -69,6 +69,7 @@ export class AuthBackendStack extends cdk.Stack {
     this.api = new apigateway.RestApi(this, 'Api', {
       restApiName: `${props.appName}-${props.stage}-api`,
       description: '${props.appName} API Gateway',
+      binaryMediaTypes: ['image/*', 'multipart/form-data'],
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
