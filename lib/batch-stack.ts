@@ -115,7 +115,7 @@ export class BatchStack extends cdk.Stack {
     const embedSpectrumWatermarkFunction = new lambda.DockerImageFunction(this, 'EmbedSpectrumWatermarkFunction', {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'embed-spectrum-watermark'),
       code: lambda.DockerImageCode.fromImageAsset('.', {
-        cmd: ['lambda.batch.embed_spectrum_watermark.handler'],
+        cmd: ['lambda.batch.embed_watermark.handler'],
         file: 'Dockerfile'
       }),
       role: lambdaRole,
