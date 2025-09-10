@@ -1,14 +1,11 @@
 import base64
-import io
+import importlib.util
 import json
 import logging
 import os
-import tempfile
 from typing import Any, Dict, Optional
 
 import boto3
-from PIL import Image
-# from trustmark import TrustMark  # Temporarily disabled
 
 # アプリ名を環境変数から取得
 APP_NAME = os.environ.get("APP_NAME", "brw")
@@ -20,6 +17,36 @@ logger.setLevel(logging.INFO)
 
 # Initialize S3 client
 s3_client = boto3.client("s3")
+
+# Import common watermark utilities using importlib to avoid lambda keyword issues
+watermark_utils_spec = importlib.util.spec_from_file_location(
+    "watermark_utils",
+    os.path.join(os.path.dirname(__file__), "..", "common", "watermark_utils.py"),
+)
+if watermark_utils_spec and watermark_utils_spec.loader:
+    watermark_utils = importlib.util.module_from_spec(watermark_utils_spec)
+    watermark_utils_spec.loader.exec_module(watermark_utils)
+
+    # Make functions available in current module
+    extract_nano_id_from_watermark = watermark_utils.extract_nano_id_from_watermark
+    embed_watermark_to_image_data = watermark_utils.embed_watermark_to_image_data
+    verify_watermark_embedding = watermark_utils.verify_watermark_embedding
+else:
+    logger.warning("Could not load watermark_utils module")
+
+    # Fallback functions (will be replaced by common utils)
+    def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
+        return {"extractedId": None, "method": "fallback", "confidence": 0.0}
+
+    def embed_watermark_to_image_data(image_data: bytes, nano_id: str) -> bytes:
+        return image_data
+
+    def verify_watermark_embedding(
+        image_data: bytes, expected_id: str
+    ) -> Dict[str, Any]:
+        return {"extractedId": None, "method": "fallback", "confidence": 0.0}
+
+# from trustmark import TrustMark  # Temporarily disabled
 
 
 def get_html_response(html_content: str) -> Dict[str, Any]:
@@ -77,44 +104,6 @@ def get_file_extension_from_signature(image_data: bytes) -> str:
     else:
         # Default to jpg if unknown
         return ".jpg"
-
-
-def extract_nano_id_from_watermark(image_data: bytes) -> Dict[str, Any]:
-    """
-    Extract Nano ID from watermarked image using trustmark.
-
-    Args:
-        image_data: Binary image data
-
-    Returns:
-        Dictionary with extracted ID, method, and confidence
-    """
-    logger.info(
-        "Extracting Nano ID from watermark, image size: %d bytes", len(image_data)
-    )
-    nano_id = None
-    confidence = 0.0
-
-    try:
-        # Load image from bytes
-        cover = Image.open(io.BytesIO(image_data)).convert("RGB")
-
-        # Temporarily disabled trustmark functionality
-        logger.warning("TrustMark functionality temporarily disabled")
-        
-        # Return no watermark found for now
-        logger.warning("No watermark detected (functionality disabled)")
-
-    except Exception as error:
-        logger.error(
-            "Error in extract_nano_id_from_watermark: %s", error, exc_info=True
-        )
-
-    return {
-        "extractedId": nano_id,
-        "method": "trustmark_P_BCH5",
-        "confidence": confidence,
-    }
 
 
 def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[bytes]:
