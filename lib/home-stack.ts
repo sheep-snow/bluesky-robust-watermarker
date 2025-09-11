@@ -17,6 +17,11 @@ export class HomeStack extends cdk.Stack {
     super(scope, id, props);
 
     // Home Lambda Function
+    const homeLogGroup = ResourcePolicy.createLambdaLogGroup(
+      this, 'HomeFunctionLogGroup',
+      ResourcePolicy.getResourceName(props.appName, props.stage, 'home'),
+      props.stage
+    );
     const homeFunction = new lambdaNodejs.NodejsFunction(this, 'HomeFunction', {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'home'),
       entry: 'lambda/home/index.ts',
@@ -24,7 +29,9 @@ export class HomeStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName
       },
+      logGroup: homeLogGroup,
       ...ResourcePolicy.getLambdaDefaults(props.stage)
+      , retryAttempts: 0
     });
 
     // API Gateway Integration - Low-levelリソースを使用

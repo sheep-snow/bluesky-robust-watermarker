@@ -47,6 +47,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             <li><a href="/signup" id="nav-signup">Sign Up</a></li>
             <li><a href="/login" id="nav-login">Login</a></li>
             <li><a href="/mypage" id="nav-mypage">My Page</a></li>
+            <li><a href="/verify-watermark">Verify</a></li>
           </ul>
         </div>
         <div class="navbar-end">

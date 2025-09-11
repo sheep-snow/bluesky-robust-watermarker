@@ -40,12 +40,18 @@ export class SignupStack extends cdk.Stack {
     });
 
     // サインアップ Lambda関数
+    const signupLogGroup = ResourcePolicy.createLambdaLogGroup(
+      this, 'SignupFunctionLogGroup',
+      ResourcePolicy.getResourceName(props.appName, props.stage, 'signup'),
+      props.stage
+    );
     const signupFunction = new lambdaNodejs.NodejsFunction(this, 'SignupFunction', {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'signup'),
       entry: 'lambda/signup/index.ts',
       handler: 'handler',
       role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
+      logGroup: signupLogGroup,
       environment: {
         APP_NAME: props.appName,
         USER_POOL_ID: cdk.Fn.importValue(`${props.appName}-${props.stage}-user-pool-id`),
@@ -54,6 +60,7 @@ export class SignupStack extends cdk.Stack {
         COGNITO_DOMAIN: cdk.Fn.importValue(`${props.appName}-${props.stage}-cognito-domain-url`),
         API_GATEWAY_URL: cdk.Fn.importValue(`${props.appName}-${props.stage}-api-gateway-url`)
       }
+      , retryAttempts: 0
     });
 
     // API Gateway統合 - Low-levelリソースを使用

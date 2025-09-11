@@ -154,6 +154,7 @@ export class MyPageStack extends cdk.Stack {
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
         STAGE: props.stage
       }
+      , retryAttempts: 0
     });
 
     // API Gateway統合 - Low-levelリソースを使用

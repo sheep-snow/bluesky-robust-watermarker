@@ -123,7 +123,7 @@ def process_watermark_async(verification_id: str, image_data: bytes):
 
                     req = Request(provenance_url)
                     req.add_header(
-                        "User-Agent", "Mozilla/5.0 (compatible; chronico-verifier)"
+                        "User-Agent", f"Mozilla/5.0 (compatible; {APP_NAME}-verifier)"
                     )
 
                     with urlopen(req, timeout=30) as response:

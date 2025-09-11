@@ -77,9 +77,9 @@ Google OAuth 2.0 クライアントの設定手順は以下の通りです。
        - /auth/userinfo.email
        - /auth/userinfo.profile
        - openid
-     -  機密性の高いスコープ
+     - 機密性の高いスコープ
        - なし
-     -  制限付きのスコープ
+     - 制限付きのスコープ
        - なし
 
 **参考ドキュメント:**
@@ -143,6 +143,8 @@ npx cdk bootstrap # 初回のみ
 ```bash
 # stage=dev を指定, または省略
 npx cdk deploy --all --context stage=dev --require-approval never
+# または個別にスタックを指定してデプロイ
+npx cdk deploy ${AppName}-dev-batch --context stage=dev --require-approval never
 ```
 
 ### 本番環境

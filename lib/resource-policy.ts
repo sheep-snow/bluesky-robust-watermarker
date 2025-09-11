@@ -17,15 +17,18 @@ export class ResourcePolicy {
    * ログ保持期間（開発環境: 1週間、本番環境: 30日）
    */
   static getLogRetention(stage: string): logs.RetentionDays {
-    return stage === 'prd' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK;
+    return logs.RetentionDays.ONE_MONTH;
   }
 
   /**
    * Lambda用のLogGroupを作成（destroy時に削除されることを保証）
    */
   static createLambdaLogGroup(scope: Construct, id: string, functionName: string, stage: string): logs.LogGroup {
+    // ランダムなpostfixを生成
+    const uniqueId = this.generateUniqueId();
+    const logGroupName = `/aws/lambda/${functionName}-${uniqueId}`;
     const logGroup = new logs.LogGroup(scope, id, {
-      logGroupName: `/aws/lambda/${functionName}`,
+      logGroupName,
       retention: this.getLogRetention(stage),
       removalPolicy: this.REMOVAL_POLICY,
     });
@@ -44,7 +47,7 @@ export class ResourcePolicy {
               actions: [
                 'logs:DeleteLogGroup'
               ],
-              resources: [`arn:aws:logs:*:*:log-group:/aws/lambda/${functionName}*`]
+              resources: [`arn:aws:logs:*:*:log-group:${logGroupName}*`]
             }),
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
@@ -63,20 +66,20 @@ export class ResourcePolicy {
         service: 'CloudWatchLogs',
         action: 'describeLogGroups',
         parameters: {
-          logGroupNamePrefix: `/aws/lambda/${functionName}`
+          logGroupNamePrefix: logGroupName
         },
-        physicalResourceId: cr.PhysicalResourceId.of(`${functionName}-log-group-manager`)
+        physicalResourceId: cr.PhysicalResourceId.of(`${functionName}-log-group-manager-${uniqueId}`)
       },
       onDelete: {
         service: 'CloudWatchLogs',
         action: 'deleteLogGroup',
         parameters: {
-          logGroupName: `/aws/lambda/${functionName}`
+          logGroupName: logGroupName
         },
         ignoreErrorCodesMatching: 'ResourceNotFoundException'
       },
       role: deleteLogGroupRole,
-      logRetention: logs.RetentionDays.ONE_WEEK
+      logRetention: logs.RetentionDays.ONE_MONTH
     });
 
     return logGroup;

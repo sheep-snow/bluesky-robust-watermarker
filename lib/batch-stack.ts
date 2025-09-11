@@ -106,23 +106,23 @@ export class BatchStack extends cdk.Stack {
     });
 
     // Watermark埋め込み関数 (Docker)
-    const embedSpectrumWatermarkLogGroup = ResourcePolicy.createLambdaLogGroup(
-      this, 'EmbedSpectrumWatermarkLogGroup',
-      ResourcePolicy.getResourceName(props.appName, props.stage, 'embed-spectrum-watermark'),
+    const embedWatermarkLogGroup = ResourcePolicy.createLambdaLogGroup(
+      this, 'EmbedWatermarkLogGroup',
+      ResourcePolicy.getResourceName(props.appName, props.stage, 'embed-watermark'),
       props.stage
     );
 
-    const embedSpectrumWatermarkFunction = new lambda.DockerImageFunction(this, 'EmbedSpectrumWatermarkFunction', {
-      functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'embed-spectrum-watermark'),
+    const embedWatermarkFunction = new lambda.DockerImageFunction(this, 'EmbedWatermarkFunction', {
+      functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'embed-watermark'),
       code: lambda.DockerImageCode.fromImageAsset('.', {
         cmd: ['lambda.batch.embed_watermark.handler'],
         file: 'Dockerfile'
       }),
       role: lambdaRole,
-      timeout: cdk.Duration.minutes(10), // Longer timeout for spectrum watermarking
-      memorySize: 1024, // More memory for image processing
+      timeout: cdk.Duration.minutes(5), // Longer timeout for watermarking
+      memorySize: 4096, // More memory for image processing
       retryAttempts: 0,
-      logGroup: embedSpectrumWatermarkLogGroup,
+      logGroup: embedWatermarkLogGroup,
       environment: {
         APP_NAME: props.appName,
         POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
@@ -138,6 +138,7 @@ export class BatchStack extends cdk.Stack {
     );
 
     const postToBlueskyFunction = new nodejs.NodejsFunction(this, 'PostToBlueskyFunction', {
+      retryAttempts: 0,
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'post-to-bluesky'),
       entry: 'lambda/batch/post-to-bluesky.ts',
       handler: 'handler',
@@ -160,6 +161,7 @@ export class BatchStack extends cdk.Stack {
     );
 
     const generateProvenanceFunction = new nodejs.NodejsFunction(this, 'GenerateProvenanceFunction', {
+      retryAttempts: 0,
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'generate-provenance'),
       entry: 'lambda/batch/generate-provenance.ts',
       handler: 'handler',
@@ -184,6 +186,7 @@ export class BatchStack extends cdk.Stack {
     );
 
     const updateUserListFunction = new nodejs.NodejsFunction(this, 'UpdateUserListFunction', {
+      retryAttempts: 0,
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'update-user-list'),
       entry: 'lambda/batch/update-user-list.ts',
       handler: 'handler',
@@ -203,8 +206,8 @@ export class BatchStack extends cdk.Stack {
     });
 
     // Step Functions定義
-    const embedSpectrumWatermarkTask = new stepfunctionsTasks.LambdaInvoke(this, 'EmbedSpectrumWatermarkTask', {
-      lambdaFunction: embedSpectrumWatermarkFunction,
+    const embedWatermarkTask = new stepfunctionsTasks.LambdaInvoke(this, 'EmbedWatermarkTask', {
+      lambdaFunction: embedWatermarkFunction,
       outputPath: '$.Payload'
     });
 
@@ -224,7 +227,7 @@ export class BatchStack extends cdk.Stack {
     });
 
     // ワークフロー定義（スペクトラム透かし処理）
-    const definition = embedSpectrumWatermarkTask
+    const definition = embedWatermarkTask
       .next(postToBlueskyTask)
       .next(generateProvenanceTask)
       .next(updateUserListTask);
@@ -243,6 +246,7 @@ export class BatchStack extends cdk.Stack {
     );
 
     const triggerFunction = new nodejs.NodejsFunction(this, 'TriggerFunction', {
+      retryAttempts: 0,
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'post-trigger'),
       entry: 'lambda/batch/trigger.ts',
       handler: 'handler',

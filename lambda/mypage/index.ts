@@ -369,8 +369,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           <div class="navbar-center hidden lg:flex">
             <ul class="menu menu-horizontal px-1">
               <li><a href="/">Home</a></li>
-              <li><a href="/signup">Sign Up</a></li>
-              <li><a href="/login">Login</a></li>
+              <li id="signupNavItem"><a href="/signup">Sign Up</a></li>
+              <li id="loginNavItem"><a href="/login">Login</a></li>
               <li><a href="/mypage" class="active">My Page</a></li>
               <li><a href="/verify-watermark">Verify</a></li>
             </ul>
@@ -412,7 +412,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 gap-8">
               <div class="card bg-base-100 shadow-xl">
                 <div class="card-body">
                   <h2 class="card-title text-2xl mb-4">🔗 Bluesky Settings</h2>
@@ -524,6 +524,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           } else {
             document.getElementById('authStatus').classList.add('hidden');
             document.getElementById('content').classList.remove('hidden');
+            
+            // Hide signup/login buttons when user is logged in
+            document.getElementById('signupNavItem').style.display = 'none';
+            document.getElementById('loginNavItem').style.display = 'none';
+            document.getElementById('signupFooterLink').style.display = 'none';
+            document.getElementById('loginFooterLink').style.display = 'none';
             
             // Load existing user info
             loadUserInfo();
@@ -719,8 +725,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
           <nav class="grid grid-flow-col gap-4">
             <a href="/" class="link link-hover">Home</a>
-            <a href="/signup" class="link link-hover">Sign Up</a>
-            <a href="/login" class="link link-hover">Login</a>
+            <a id="signupFooterLink" href="/signup" class="link link-hover">Sign Up</a>
+            <a id="loginFooterLink" href="/login" class="link link-hover">Login</a>
             <a href="/mypage" class="link link-hover">My Page</a>
             <a href="/verify-watermark" class="link link-hover">Verify</a>
           </nav>
