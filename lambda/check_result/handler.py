@@ -142,7 +142,7 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
         <p>来歴情報が利用可能です。</p>
         <a href="{provenance_url}" class="provenance-btn">来歴情報を確認</a>
         <br>
-        <button class="back-btn" onclick="history.back()">別の画像を試す</button>
+        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>
 </body>
 </html>"""
@@ -165,7 +165,7 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
         <h1>⚠️ 透かしは見つかりましたが...</h1>
         <div class="warning">この透かしに対応する来歴情報が見つかりませんでした</div>
         <p>透かしID: {extracted_id}</p>
-        <button class="back-btn" onclick="history.back()">別の画像を試す</button>
+        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>
 </body>
 </html>"""
@@ -188,7 +188,7 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
         <h1>❌ 透かしが見つかりません</h1>
         <div class="error">この画像には {APP_NAME} の透かしが埋め込まれていません</div>
         <p>この画像は {APP_NAME} で生成されていない可能性があります。</p>
-        <button class="back-btn" onclick="history.back()">別の画像を試す</button>
+        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>
 </body>
 </html>"""
@@ -213,7 +213,7 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
         <h1>⚠️ 検証中にエラーが発生しました</h1>
         <div class="error">エラー詳細: {error_message}</div>
         <p>検証ID: {verification_id}</p>
-        <button class="back-btn" onclick="history.back()">別の画像を試す</button>
+        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>
 </body>
 </html>"""
@@ -237,7 +237,7 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
         <h1>⚠️ 不明なステータス</h1>
         <div class="error">ステータス: {result["status"]}</div>
         <p>検証ID: {verification_id}</p>
-        <button class="back-btn" onclick="history.back()">別の画像を試す</button>
+        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>
 </body>
 </html>"""
