@@ -4,7 +4,10 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import { ParamsResourceStack } from './params-resource-stack';
@@ -138,8 +141,26 @@ export class AuthBackendStack extends cdk.Stack {
       cookieBehavior: cloudfront.CacheCookieBehavior.none()
     });
 
-    // CloudFront Distribution (単一API Gateway Origin)
+    // S3バケット（静的ファイル用）
+    const staticFilesBucket = new s3.Bucket(this, 'StaticFilesBucket', {
+      bucketName: `${props.appName}-${props.stage}-static-files`,
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true
+    });
+
+    // favicon.icoをS3にデプロイ
+    new s3deploy.BucketDeployment(this, 'DeployStaticFiles', {
+      sources: [s3deploy.Source.asset('.', {
+        exclude: ['*', '!favicon.ico']
+      })],
+      destinationBucket: staticFilesBucket
+    });
+
+    // CloudFront Distribution (API Gateway + S3 Origins)
     const apiOrigin = new origins.RestApiOrigin(this.api);
+    const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(staticFilesBucket);
 
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
@@ -192,46 +213,13 @@ export class AuthBackendStack extends cdk.Stack {
           cachePolicy: cachePolicy,
           originRequestPolicy: originRequestPolicy
         },
-        // User list pages (S3オリジン)
-        'users/*': {
-          origin: new origins.S3Origin(props.paramsResourceStack.provenancePublicBucket),
+        // Favicon (S3経由)
+        'favicon.ico': {
+          origin: s3Origin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
           cachePolicy: s3CachePolicy
-        },
-        // Provenance pages (S3オリジン) - 投稿IDのパスパターン
-        'provenance/*': {
-          origin: new origins.S3Origin(props.paramsResourceStack.provenancePublicBucket),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: s3CachePolicy,
-          // ディレクトリパスでのアクセス時にindex.htmlを自動追加するFunction
-          functionAssociations: [{
-            function: new cloudfront.Function(this, 'IndexRewriteFunction', {
-              functionName: `${props.appName}-${props.stage}-index-rewrite`,
-              code: cloudfront.FunctionCode.fromInline(`
-function handler(event) {
-    var request = event.request;
-    var uri = request.uri;
-    
-    // URIが/で終わる場合、index.htmlを追加
-    if (uri.endsWith('/')) {
-        request.uri += 'index.html';
-    }
-    // URIがディレクトリ名のみの場合（拡張子なし）、/index.htmlを追加  
-    else if (!uri.includes('.')) {
-        request.uri += '/index.html';
-    }
-    
-    return request;
-}
-              `),
-              comment: 'Rewrite directory requests to index.html'
-            }),
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
-          }]
         }
       },
       domainNames: [props.paramsResourceStack.domainName],
