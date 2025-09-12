@@ -526,10 +526,15 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             document.getElementById('content').classList.remove('hidden');
             
             // Hide signup/login buttons when user is logged in
-            document.getElementById('signupNavItem').style.display = 'none';
-            document.getElementById('loginNavItem').style.display = 'none';
-            document.getElementById('signupFooterLink').style.display = 'none';
-            document.getElementById('loginFooterLink').style.display = 'none';
+            const signupNavItem = document.getElementById('signupNavItem');
+            const loginNavItem = document.getElementById('loginNavItem');
+            const signupFooterLink = document.getElementById('signupFooterLink');
+            const loginFooterLink = document.getElementById('loginFooterLink');
+            
+            if (signupNavItem) signupNavItem.style.display = 'none';
+            if (loginNavItem) loginNavItem.style.display = 'none';
+            if (signupFooterLink) signupFooterLink.style.display = 'none';
+            if (loginFooterLink) loginFooterLink.style.display = 'none';
             
             // Load existing user info
             loadUserInfo();
@@ -537,26 +542,31 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             // Settings form submission
             document.getElementById('settingsForm').addEventListener('submit', async (e) => {
               e.preventDefault();
+              
               const data = {
                 blueskyUserId: document.getElementById('blueskyUserId').value,
                 blueskyAppPassword: document.getElementById('blueskyAppPassword').value
               };
               
-              const response = await fetch('/mypage', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + accessToken
-                },
-                body: JSON.stringify(data)
-              });
-              
-              if (response.ok) {
-                alert('Settings saved and validated successfully!');
-                loadUserInfo();
-              } else {
-                const errorData = await response.json();
-                alert('Failed to save settings: ' + (errorData.error || 'Unknown error'));
+              try {
+                const response = await fetch('/mypage', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + accessToken
+                  },
+                  body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                  alert('Settings saved and validated successfully!');
+                  loadUserInfo();
+                } else {
+                  const errorData = await response.json();
+                  alert('Failed to save settings: ' + (errorData.error || 'Unknown error'));
+                }
+              } catch (error) {
+                alert('Network error: ' + error.message);
               }
             });
             
