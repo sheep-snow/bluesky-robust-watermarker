@@ -35,6 +35,13 @@ export const getThemeScript = () => `
       localStorage.setItem('${APP_NAME.toLowerCase()}-theme', theme);
     }
     
+    function logout() {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/';
+    }
+    
     // ページ読み込み時にテーマを適用
     document.addEventListener('DOMContentLoaded', initTheme);
   </script>
@@ -70,11 +77,17 @@ export const getThemeSelector = () => `
       <li><a onclick="changeTheme('black')">⚫ Black</a></li>
       <li><a onclick="changeTheme('luxury')">💰 Luxury</a></li>
       <li><a onclick="changeTheme('dracula')">🧛 Dracula</a></li>
+      <li><a onclick="changeTheme('cmyk')">🎨 CMYK</a></li>
       <li><a onclick="changeTheme('autumn')">🍂 Autumn</a></li>
       <li><a onclick="changeTheme('business')">💼 Business</a></li>
+      <li><a onclick="changeTheme('acid')">🧪 Acid</a></li>
+      <li><a onclick="changeTheme('lemonade')">🍋 Lemonade</a></li>
       <li><a onclick="changeTheme('night')">🌃 Night</a></li>
       <li><a onclick="changeTheme('coffee')">☕ Coffee</a></li>
       <li><a onclick="changeTheme('winter')">❄️ Winter</a></li>
+      <li><a onclick="changeTheme('dim')">🔅 Dim</a></li>
+      <li><a onclick="changeTheme('nord')">🏔️ Nord</a></li>
+      <li><a onclick="changeTheme('sunset')">🌅 Sunset</a></li>
     </ul>
   </div>
 `;
@@ -82,6 +95,20 @@ export const getThemeSelector = () => `
 export const getNavbar = (currentPage: string = '') => `
   <div class="navbar bg-base-100 shadow-lg">
     <div class="navbar-start">
+      <div class="dropdown">
+        <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
+          </svg>
+        </div>
+        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+          <li><a href="/" class="${currentPage === 'home' ? 'active' : ''}">Home</a></li>
+          <li><a href="/signup" class="${currentPage === 'signup' ? 'active' : ''}">Sign Up</a></li>
+          <li><a href="/login" class="${currentPage === 'login' ? 'active' : ''}">Login</a></li>
+          <li><a href="/mypage" class="${currentPage === 'mypage' ? 'active' : ''}">My Page</a></li>
+          <li><a href="/verify-watermark" class="${currentPage === 'verify-watermark' ? 'active' : ''}">Verify</a></li>
+        </ul>
+      </div>
       <a href="/" class="btn btn-ghost text-xl"> ${APP_NAME}</a>
     </div>
     <div class="navbar-center hidden lg:flex">
@@ -90,9 +117,13 @@ export const getNavbar = (currentPage: string = '') => `
         <li><a href="/signup" class="${currentPage === 'signup' ? 'active' : ''}">Sign Up</a></li>
         <li><a href="/login" class="${currentPage === 'login' ? 'active' : ''}">Login</a></li>
         <li><a href="/mypage" class="${currentPage === 'mypage' ? 'active' : ''}">My Page</a></li>
+        <li><a href="/verify-watermark" class="${currentPage === 'verify-watermark' ? 'active' : ''}">Verify</a></li>
       </ul>
     </div>
     <div class="navbar-end">
+      <div class="hidden" id="auth-actions">
+        <button onclick="logout()" class="btn btn-error btn-sm mr-2">Logout</button>
+      </div>
       ${getThemeSelector()}
     </div>
   </div>
@@ -100,12 +131,6 @@ export const getNavbar = (currentPage: string = '') => `
 
 export const getFooter = () => `
   <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
-    <nav class="grid grid-flow-col gap-4">
-      <a href="/" class="link link-hover">Home</a>
-      <a href="/signup" class="link link-hover">Sign Up</a>
-      <a href="/login" class="link link-hover">Login</a>
-      <a href="/mypage" class="link link-hover">My Page</a>
-    </nav>
     <aside>
       <p>© 2025 ${APP_NAME} - Image Provenance Service</p>
     </aside>
@@ -126,6 +151,40 @@ export const wrapWithLayout = (title: string, content: string, currentPage: stri
       ${content}
     </main>
     ${getFooter()}
+    <script>
+      // Check authentication and hide/show nav items
+      function checkAuthAndUpdateNav() {
+        const accessToken = localStorage.getItem('access_token');
+        const idToken = localStorage.getItem('id_token');
+        const isAuthenticated = accessToken && idToken;
+        
+        const signupLinks = document.querySelectorAll('a[href="/signup"]');
+        const loginLinks = document.querySelectorAll('a[href="/login"]');
+        const authActions = document.getElementById('auth-actions');
+        
+        signupLinks.forEach(link => {
+          if (link.closest('li')) {
+            link.closest('li').style.display = isAuthenticated ? 'none' : '';
+          } else {
+            link.style.display = isAuthenticated ? 'none' : '';
+          }
+        });
+        
+        loginLinks.forEach(link => {
+          if (link.closest('li')) {
+            link.closest('li').style.display = isAuthenticated ? 'none' : '';
+          } else {
+            link.style.display = isAuthenticated ? 'none' : '';
+          }
+        });
+        
+        if (authActions) {
+          authActions.classList.toggle('hidden', !isAuthenticated);
+        }
+      }
+      
+      document.addEventListener('DOMContentLoaded', checkAuthAndUpdateNav);
+    </script>
   </body>
   </html>
 `;

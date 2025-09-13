@@ -5,6 +5,7 @@ const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
 const { AtpAgent } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
 const { detectImageFormat, getImageExtension, getContentType } = require('../common/image-utils');
+const { wrapWithLayout } = require('../common/ui-framework');
 
 // アプリ名を環境変数から取得
 const APP_NAME = process.env.APP_NAME || 'brw';
@@ -45,113 +46,53 @@ function generateUUID() {
 
 // Generate empty provenance list page for new users
 async function generateEmptyProvenanceList(userInfo: any) {
-  const listPageHtml = `
-<!DOCTYPE html>
-<html data-theme="cupcake">
-<head>
-    <title>${APP_NAME} - ${userInfo.blueskyUserId} Provenance List</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
-    <script>
-      function initTheme() {
-        const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-      }
-      function changeTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('${APP_NAME.toLowerCase()}-theme', theme);
-      }
-      document.addEventListener('DOMContentLoaded', initTheme);
-    </script>
-</head>
-<body class="min-h-screen flex flex-col bg-base-200">
-    <div class="navbar bg-base-100 shadow-lg">
-      <div class="navbar-start">
-        <a href="/" class="btn btn-ghost text-xl">📄 ${APP_NAME}</a>
-      </div>
-      <div class="navbar-center hidden lg:flex">
-        <ul class="menu menu-horizontal px-1">
-          <li><a href="/">Home</a></li>
-          <li><a href="/mypage">My Page</a></li>
-          <li><a href="/users/${userInfo.provenancePageId}.html" class="active">Provenance List</a></li>
-        </ul>
-      </div>
-      <div class="navbar-end">
-        <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost">
-            Theme
-            <svg width="12px" height="12px" class="h-2 w-2 fill-current opacity-60 inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="m1799 349 242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
+  const content = `
+    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+      <div class="hero-content text-center py-12">
+        <div class="max-w-md">
+          <h1 class="mb-5 text-4xl font-bold">📄 Provenance List</h1>
+          <h2 class="mb-5 text-2xl font-bold">${userInfo.blueskyUserId}</h2>
+          <p class="mb-5 text-lg">来歴の一覧</p>
+          <div class="flex gap-4 justify-center">
+            <a href="/mypage" class="btn btn-soft btn-primary">← Back to My Page</a>
           </div>
-          <ul tabindex="0" class="dropdown-content z-[1] p-2 shadow-2xl bg-base-300 rounded-box w-52">
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Cupcake" value="cupcake" onclick="changeTheme('cupcake')"/></li>
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Dark" value="dark" onclick="changeTheme('dark')"/></li>
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Emerald" value="emerald" onclick="changeTheme('emerald')"/></li>
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Corporate" value="corporate" onclick="changeTheme('corporate')"/></li>
-          </ul>
         </div>
       </div>
     </div>
-    
-    <div class="container mx-auto px-4 py-8 flex-1">
-      <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
-        <div class="hero-content text-center py-12">
-          <div class="max-w-md">
-            <h1 class="mb-5 text-4xl font-bold">📄 Provenance List</h1>
-            <h2 class="mb-5 text-2xl font-bold">${userInfo.blueskyUserId}</h2>
-            <p class="mb-5 text-lg">Verified image provenance records</p>
-            <div class="flex gap-4 justify-center">
-              <a href="/mypage" class="btn btn-outline btn-primary">← Back to My Page</a>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div class="stats stats-vertical lg:stats-horizontal shadow mb-8 bg-base-100">
-        <div class="stat">
-          <div class="stat-figure text-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-          </div>
-          <div class="stat-title">Total Verified Posts</div>
-          <div class="stat-value text-primary">0</div>
+    <div class="stats stats-vertical lg:stats-horizontal shadow mb-8 bg-base-100">
+      <div class="stat">
+        <div class="stat-figure text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
         </div>
-        <div class="stat">
-          <div class="stat-figure text-secondary">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path></svg>
-          </div>
-          <div class="stat-title">Last Updated</div>
-          <div class="stat-value text-secondary text-lg">${new Date().toLocaleDateString()}</div>
-          <div class="stat-desc">${new Date().toLocaleTimeString()}</div>
-        </div>
+        <div class="stat-title">来歴数</div>
+        <div class="stat-value text-primary">0</div>
       </div>
+      <div class="stat">
+        <div class="stat-figure text-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path></svg>
+        </div>
+        <div class="stat-title">Last Updated</div>
+        <div class="stat-value text-secondary text-lg">${new Date().toLocaleDateString()}</div>
+        <div class="stat-desc">${new Date().toLocaleTimeString()}</div>
+      </div>
+    </div>
 
-      <div class="hero min-h-64 bg-base-100 rounded-lg">
-        <div class="hero-content text-center">
-          <div class="max-w-md">
-            <div class="text-6xl mb-4">🔍</div>
-            <h3 class="text-xl font-bold mb-4">No Verified Posts Found</h3>
-            <p class="text-base-content/70">No verified posts found for this user yet. Start creating posts with provenance tracking!</p>
-            <div class="mt-6">
-              <a href="/mypage" class="btn btn-primary">Create Your First Post</a>
-            </div>
+    <div class="hero min-h-64 bg-base-100 rounded-lg">
+      <div class="hero-content text-center">
+        <div class="max-w-md">
+          <div class="text-6xl mb-4">🔍</div>
+          <h3 class="text-xl font-bold mb-4">No Verified Posts Found</h3>
+          <p class="text-base-content/70">No verified posts found for this user yet. Start creating posts with provenance tracking!</p>
+          <div class="mt-6">
+            <a href="/mypage" class="btn btn-primary">Create Your First Post</a>
           </div>
         </div>
       </div>
-    </div>
-    
-    <div class="text-center py-8 bg-base-300">
-      <p class="text-base-content">This page was generated by ${APP_NAME} to list all verified provenance records for this user.</p>
-    </div>
-    
-    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
-      <div>
-        <a href="/" class="btn btn-ghost">🔍 ${APP_NAME} Home</a>
-        <p class="mt-2">Copyright © 2025 - All right reserved by ${APP_NAME}</p>
-      </div>
-    </footer>
-</body>
-</html>`;
+    </div>    
+  `;
+
+  const listPageHtml = wrapWithLayout(`${APP_NAME} - ${userInfo.blueskyUserId} Provenance List`, content, 'provenance-list');
 
   // Save empty user list page to public bucket
   const listPageCommand = new PutObjectCommand({
@@ -340,178 +281,127 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         }
       }
 
-      const html = `
-      <!DOCTYPE html>
-      <html data-theme="cupcake">
-      <head>
-        <title>${APP_NAME} - My Page</title>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        
-        <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
-        <script>
-          function initTheme() {
-            const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-          }
-          function changeTheme(theme) {
-            document.documentElement.setAttribute('data-theme', theme);
-            localStorage.setItem('${APP_NAME.toLowerCase()}-theme', theme);
-          }
-          document.addEventListener('DOMContentLoaded', initTheme);
-        </script>
-      </head>
-      <body class="min-h-screen flex flex-col bg-base-200">
-        <div class="navbar bg-base-100 shadow-lg">
-          <div class="navbar-start">
-            <a href="/" class="btn btn-ghost text-xl"> ${APP_NAME}</a>
-          </div>
-          <div class="navbar-center hidden lg:flex">
-            <ul class="menu menu-horizontal px-1">
-              <li><a href="/">Home</a></li>
-              <li id="signupNavItem"><a href="/signup">Sign Up</a></li>
-              <li id="loginNavItem"><a href="/login">Login</a></li>
-              <li><a href="/mypage" class="active">My Page</a></li>
-              <li><a href="/verify-watermark">Verify</a></li>
-            </ul>
-          </div>
-          <div class="navbar-end">
-            <div class="dropdown dropdown-end">
-              <div tabindex="0" role="button" class="btn btn-ghost">
-                Theme
-                <svg width="12px" height="12px" class="h-2 w-2 fill-current opacity-60 inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="m1799 349 242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
-              </div>
-              <ul tabindex="0" class="dropdown-content z-[1] p-2 shadow-2xl bg-base-300 rounded-box w-52">
-                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Cupcake" value="cupcake" onclick="changeTheme('cupcake')"/></li>
-                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Dark" value="dark" onclick="changeTheme('dark')"/></li>
-                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Emerald" value="emerald" onclick="changeTheme('emerald')"/></li>
-                <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Corporate" value="corporate" onclick="changeTheme('corporate')"/></li>
-              </ul>
+      const content = `
+        <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+          <div class="hero-content text-center py-12">
+            <div class="max-w-md">
+              <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
+              <p class="mb-5 text-lg">Blueskyの設定を管理し、作品を投稿する</p>
             </div>
           </div>
         </div>
         
-        <main class="flex-1 container mx-auto px-4 py-8">
-          <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
-            <div class="hero-content text-center py-12">
-              <div class="max-w-md">
-                <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
-                <p class="mb-5 text-lg">Blueskyの設定を管理し、作品を投稿する</p>
-              </div>
-            </div>
+        <div id="authStatus" class="alert alert-info">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>Checking authentication...</span>
+        </div>
+        
+        <div id="content" class="hidden">
+          <div class="flex justify-end mb-6 gap-4">
+            <a href="#" id="provenanceListLink" class="btn btn-soft hidden">View My Provenance List</a>
+            <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
           </div>
           
-          <div id="authStatus" class="alert alert-info">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            <span>Checking authentication...</span>
-          </div>
-          
-          <div id="content" class="hidden">
-            <div class="flex justify-end mb-6 gap-4">
-              <a href="#" id="provenanceListLink" class="btn btn-outline hidden">View My Provenance List</a>
-              <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
-            </div>
-            
-            <div class="grid grid-cols-1 gap-8">
-              <div class="card bg-base-100 shadow-xl">
-                <div class="card-body">
-                  <h2 class="card-title text-2xl mb-4">🔗 Bluesky 設定</h2>
-                  <form id="settingsForm" class="space-y-4">
-                    <div class="form-control">
-                      <label class="label">
-                        <span class="label-text font-semibold">Bluesky User ID</span>
-                      </label>
-                      <input type="text" id="blueskyUserId" placeholder="alice.bsky.social or @alice.bsky.social" class="input input-bordered" />
-                    </div>
-                    <div class="form-control">
-                      <label class="label">
-                        <span class="label-text font-semibold">Bluesky App Password</span>
-                      </label>
-                      <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
-                    </div>
-                    <button type="submit" class="btn btn-primary w-full">保存</button>
-                  </form>
-                </div>
-              </div>
-              
-              <div class="card bg-base-100 shadow-xl">
-                <div class="card-body">
-                  <h2 class="card-title text-2xl mb-4">✍️ 作品を投稿</h2>
-                  <form id="postForm" class="space-y-4">
-                    <div class="form-control">
-                      <label class="label">
-                        <span class="label-text font-semibold">Post Text</span>
-                      </label>
-                      <textarea id="postText" rows="4" placeholder="投稿文..." class="textarea textarea-bordered"></textarea>
-                    </div>
-                    <div class="form-control">
-                      <label class="label">
-                        <span class="label-text font-semibold">Image</span>
-                      </label>
-                      <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
-                    </div>
-                    <button type="submit" class="btn btn-accent w-full">投稿</button>
-                  </form>
-                </div>
-              </div>
-            </div>
-            
-            <div id="userInfo" class="card bg-base-100 shadow-xl mt-8 hidden">
+          <div class="grid grid-cols-1 gap-8">
+            <div class="card bg-base-100 shadow-xl">
               <div class="card-body">
-                <h3 class="card-title text-xl mb-4">📊 Current Settings</h3>
-                <div class="stats stats-vertical lg:stats-horizontal shadow">
-                  <div class="stat">
-                    <div class="stat-title">Bluesky User ID</div>
-                    <div class="stat-value text-lg" id="currentUserId"></div>
+                <h2 class="card-title text-2xl mb-4">🔗 Bluesky 設定</h2>
+                <form id="settingsForm" class="space-y-4">
+                  <div class="form-control">
+                    <label class="label">
+                      <span class="label-text font-semibold">Bluesky User ID</span>
+                    </label>
+                    <input type="text" id="blueskyUserId" placeholder="alice.bsky.social or @alice.bsky.social" class="input input-bordered" />
                   </div>
-                  <div class="stat">
-                    <div class="stat-title">Last Updated</div>
-                    <div class="stat-value text-lg" id="lastUpdated"></div>
+                  <div class="form-control">
+                    <label class="label">
+                      <span class="label-text font-semibold">Bluesky App Password</span>
+                    </label>
+                    <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
                   </div>
-                  <div class="stat">
-                    <div class="stat-title">Last Validated</div>
-                    <div class="stat-value text-lg" id="lastValidated"></div>
+                  <button type="submit" class="btn btn-primary w-full">保存</button>
+                </form>
+              </div>
+            </div>
+            
+            <div class="card bg-base-100 shadow-xl">
+              <div class="card-body">
+                <h2 class="card-title text-2xl mb-4">✍️ 作品を投稿</h2>
+                <form id="postForm" class="space-y-4">
+                  <div class="form-control">
+                    <label class="label">
+                      <span class="label-text font-semibold">投稿文</span>
+                    </label>
+                    <textarea id="postText" rows="4" placeholder="投稿文..." class="textarea textarea-bordered"></textarea>
                   </div>
-                </div>
+                  <div class="form-control">
+                    <label class="label">
+                      <span class="label-text font-semibold">Image</span>
+                    </label>
+                    <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
+                  </div>
+                  <button type="submit" class="btn btn-accent w-full">投稿</button>
+                </form>
               </div>
             </div>
           </div>
           
-          <!-- Processing Modal -->
-          <dialog id="processingModal" class="modal">
-            <div class="modal-box">
-              <h3 class="font-bold text-lg">🔄 Processing Your Post</h3>
-              <div class="py-4">
-                <div class="flex items-center space-x-4">
-                  <span class="loading loading-spinner loading-lg text-primary"></span>
-                  <div>
-                    <p class="text-base-content">Post ID: <span id="processingPostId" class="font-mono font-bold"></span></p>
-                    <p class="text-sm text-base-content/70 mt-2" id="processingStatus">Generating provenance page...</p>
-                  </div>
+          <div id="userInfo" class="card bg-base-100 shadow-xl mt-8 hidden">
+            <div class="card-body">
+              <h3 class="card-title text-xl mb-4">📊 Current Settings</h3>
+              <div class="stats stats-vertical lg:stats-horizontal shadow">
+                <div class="stat">
+                  <div class="stat-title">Bluesky User ID</div>
+                  <div class="stat-value text-lg" id="currentUserId"></div>
                 </div>
-                <div class="mt-6">
-                  <progress class="progress progress-primary w-full" id="processingProgress"></progress>
-                  <div class="text-xs text-base-content/70 mt-4">
-                    <div id="processingSteps" class="space-y-2">
-                      <div class="step flex items-center space-x-2" id="step-watermark">
-                        <span>📝</span><span>Embedding watermark...</span>
-                      </div>
-                      <div class="step flex items-center space-x-2" id="step-bluesky">
-                        <span>🦋</span><span>Posting to Bluesky...</span>
-                      </div>
-                      <div class="step flex items-center space-x-2" id="step-provenance">
-                        <span>📄</span><span>Generating provenance page...</span>
-                      </div>
+                <div class="stat">
+                  <div class="stat-title">Last Updated</div>
+                  <div class="stat-value text-lg" id="lastUpdated"></div>
+                </div>
+                <div class="stat">
+                  <div class="stat-title">Last Validated</div>
+                  <div class="stat-value text-lg" id="lastValidated"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Processing Modal -->
+        <dialog id="processingModal" class="modal">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg">🔄 Processing Your Post</h3>
+            <div class="py-4">
+              <div class="flex items-center space-x-4">
+                <span class="loading loading-spinner loading-lg text-primary"></span>
+                <div>
+                  <p class="text-base-content">Post ID: <span id="processingPostId" class="font-mono font-bold"></span></p>
+                  <p class="text-sm text-base-content/70 mt-2" id="processingStatus">Generating provenance page...</p>
+                </div>
+              </div>
+              <div class="mt-6">
+                <progress class="progress progress-primary w-full" id="processingProgress"></progress>
+                <div class="text-xs text-base-content/70 mt-4">
+                  <div id="processingSteps" class="space-y-2">
+                    <div class="step flex items-center space-x-2" id="step-watermark">
+                      <span>📝</span><span>Embedding watermark...</span>
+                    </div>
+                    <div class="step flex items-center space-x-2" id="step-bluesky">
+                      <span>🦋</span><span>Posting to Bluesky...</span>
+                    </div>
+                    <div class="step flex items-center space-x-2" id="step-provenance">
+                      <span>📄</span><span>Generating provenance page...</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <form method="dialog" class="modal-backdrop">
-              <button>close</button>
-            </form>
-          </dialog>
-          
+          </div>
+          <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+          </form>
+        </dialog>
+        
         <script>
           // Check authentication
           const accessToken = localStorage.getItem('access_token');
@@ -524,17 +414,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           } else {
             document.getElementById('authStatus').classList.add('hidden');
             document.getElementById('content').classList.remove('hidden');
-            
-            // Hide signup/login buttons when user is logged in
-            const signupNavItem = document.getElementById('signupNavItem');
-            const loginNavItem = document.getElementById('loginNavItem');
-            const signupFooterLink = document.getElementById('signupFooterLink');
-            const loginFooterLink = document.getElementById('loginFooterLink');
-            
-            if (signupNavItem) signupNavItem.style.display = 'none';
-            if (loginNavItem) loginNavItem.style.display = 'none';
-            if (signupFooterLink) signupFooterLink.style.display = 'none';
-            if (loginFooterLink) loginFooterLink.style.display = 'none';
             
             // Load existing user info
             loadUserInfo();
@@ -575,6 +454,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               e.preventDefault();
               const text = document.getElementById('postText').value;
               const imageFile = document.getElementById('postImage').files[0];
+              
+              // Check file size limit (3MB)
+              if (imageFile && imageFile.size > 3 * 1024 * 1024) {
+                alert('画像ファイルサイズは3MB以下にしてください。');
+                return;
+              }
               
               let imageBase64 = null;
               if (imageFile) {
@@ -730,23 +615,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             window.location.reload();
           }
         </script>
-        </main>
-        
-        <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
-          <nav class="grid grid-flow-col gap-4">
-            <a href="/" class="link link-hover">Home</a>
-            <a id="signupFooterLink" href="/signup" class="link link-hover">Sign Up</a>
-            <a id="loginFooterLink" href="/login" class="link link-hover">Login</a>
-            <a href="/mypage" class="link link-hover">My Page</a>
-            <a href="/verify-watermark" class="link link-hover">Verify</a>
-          </nav>
-          <aside>
-            <p>© 2025 ${APP_NAME} - Image Provenance Service</p>
-          </aside>
-        </footer>
-      </body>
-      </html>
-    `;
+      `;
+
+      const html = wrapWithLayout(`${APP_NAME} - My Page`, content, 'mypage');
       return { statusCode: 200, headers: { ...headers, 'Content-Type': 'text/html' }, body: html };
     }
 

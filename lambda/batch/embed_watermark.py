@@ -2,9 +2,12 @@ import importlib.util
 import json
 import logging
 import os
+import tempfile
 from typing import Any, Dict, Optional, Union
+from io import BytesIO
 
 import boto3
+from PIL import Image
 
 # Import common watermark utilities using importlib to avoid lambda keyword issues
 watermark_utils_spec = importlib.util.spec_from_file_location(
@@ -47,6 +50,68 @@ logger.setLevel(logging.INFO)
 
 # Initialize S3 client
 s3_client = boto3.client("s3")
+
+# Bluesky file size limit (976.56KB)
+MAX_FILE_SIZE_BYTES = 1000000  # 976.56KB ≈ 1MB
+
+
+def compress_image_to_size_limit(image_data: bytes, max_size: int = MAX_FILE_SIZE_BYTES) -> bytes:
+    """
+    Compress image to fit within size limit.
+    
+    Args:
+        image_data: Original image data
+        max_size: Maximum file size in bytes
+        
+    Returns:
+        Compressed image data
+    """
+    logger.info(f"Compressing image from {len(image_data)} bytes to under {max_size} bytes")
+    
+    # If already under limit, return as-is
+    if len(image_data) <= max_size:
+        logger.info("Image already under size limit")
+        return image_data
+    
+    try:
+        img = Image.open(BytesIO(image_data))
+        
+        # Convert to RGB if necessary
+        if img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        
+        quality = 90
+        
+        while quality >= 10:
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
+                temp_path = temp_file.name
+            
+            try:
+                # Save with current quality
+                img.save(temp_path, format='JPEG', quality=quality, optimize=True)
+                
+                # Read compressed data
+                with open(temp_path, 'rb') as f:
+                    compressed_data = f.read()
+                
+                logger.info(f"Quality {quality}: {len(compressed_data)} bytes")
+                
+                if len(compressed_data) <= max_size:
+                    logger.info(f"Compression successful: {len(compressed_data)} bytes with quality {quality}")
+                    return compressed_data
+                
+                quality -= 5
+                
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+        
+        raise Exception(f'Could not compress image to under {max_size} bytes')
+        
+    except Exception as e:
+        logger.error(f"Error compressing image: {e}")
+        raise
 
 
 def find_image_file(bucket_name: str, post_id: str) -> Optional[str]:
@@ -325,16 +390,27 @@ def embed_watermark(
         # Download image from S3
         logger.info("Downloading image from S3...")
         response = s3_client.get_object(Bucket=bucket_name, Key=key)
-        image_data = response["Body"].read()
-        logger.info(f"Downloaded image size: {len(image_data)} bytes")
+        original_image_data = response["Body"].read()
+        logger.info(f"Downloaded image size: {len(original_image_data)} bytes")
+
+        # Step 1: Compress image if over 1MB before watermarking
+        compressed_image_data = compress_image_to_size_limit(original_image_data)
+        logger.info(f"Pre-watermark compression: {len(original_image_data)} -> {len(compressed_image_data)} bytes")
 
         # Extract nano ID from watermark data
         nano_id = watermark_data.get("postId")
         if not nano_id:
             raise ValueError("postId not found in watermarkData")
 
-        # Embed watermark using the separated function
-        watermarked_data = embed_watermark_to_image_data(image_data, str(nano_id))
+        # Step 2: Embed watermark using the compressed image
+        watermarked_data = embed_watermark_to_image_data(compressed_image_data, str(nano_id))
+        logger.info(f"After watermark embedding: {len(watermarked_data)} bytes")
+
+        # Step 3: Re-compress if still over 1MB after watermarking
+        if len(watermarked_data) > MAX_FILE_SIZE_BYTES:
+            logger.info("Re-compressing watermarked image to meet size limit")
+            watermarked_data = compress_image_to_size_limit(watermarked_data)
+            logger.info(f"Final compressed size: {len(watermarked_data)} bytes")
 
         # Verify the watermark was embedded correctly using common verification function
         verification_result = verify_watermark_embedding(watermarked_data, str(nano_id))

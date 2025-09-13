@@ -46,7 +46,7 @@ export interface VerifyStackProps extends cdk.StackProps {
             role: verifyRole,
             ...ResourcePolicy.getLambdaDefaults(props.stage),
             timeout: cdk.Duration.minutes(5),
-            memorySize: 4096,
+            memorySize: 3008,
             retryAttempts: 0,
             environment: {
                 APP_NAME: props.appName,

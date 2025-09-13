@@ -120,7 +120,7 @@ export class BatchStack extends cdk.Stack {
       }),
       role: lambdaRole,
       timeout: cdk.Duration.minutes(5), // Longer timeout for watermarking
-      memorySize: 4096, // More memory for image processing
+      memorySize: 3008, // More memory for image processing
       retryAttempts: 0,
       logGroup: embedWatermarkLogGroup,
       environment: {
