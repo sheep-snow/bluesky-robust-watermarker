@@ -39,12 +39,18 @@ export class LoginStack extends cdk.Stack {
     });
 
     // ログイン Lambda関数
+    const loginLogGroup = ResourcePolicy.createLambdaLogGroup(
+      this, 'LoginFunctionLogGroup',
+      ResourcePolicy.getResourceName(props.appName, props.stage, 'login'),
+      props.stage
+    );
     const loginFunction = new lambdaNodejs.NodejsFunction(this, 'LoginFunction', {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'login'),
       entry: 'lambda/login/index.ts',
       handler: 'handler',
       role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
+      logGroup: loginLogGroup,
       environment: {
         APP_NAME: props.appName,
         USER_POOL_ID: cdk.Fn.importValue(`${props.appName}-${props.stage}-user-pool-id`),
@@ -53,15 +59,22 @@ export class LoginStack extends cdk.Stack {
         COGNITO_DOMAIN: cdk.Fn.importValue(`${props.appName}-${props.stage}-cognito-domain-url`),
         API_GATEWAY_URL: cdk.Fn.importValue(`${props.appName}-${props.stage}-api-gateway-url`)
       }
+      , retryAttempts: 0
     });
 
     // コールバック処理 Lambda関数
+    const callbackLogGroup = ResourcePolicy.createLambdaLogGroup(
+      this, 'CallbackFunctionLogGroup',
+      ResourcePolicy.getResourceName(props.appName, props.stage, 'callback'),
+      props.stage
+    );
     const callbackFunction = new lambdaNodejs.NodejsFunction(this, 'CallbackFunction', {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'callback'),
       entry: 'lambda/login/callback.ts',
       handler: 'handler',
       role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
+      logGroup: callbackLogGroup,
       environment: {
         APP_NAME: props.appName,
         DOMAIN_NAME: props.paramsResourceStack.domainName,
@@ -69,6 +82,7 @@ export class LoginStack extends cdk.Stack {
         COGNITO_DOMAIN: cdk.Fn.importValue(`${props.appName}-${props.stage}-cognito-domain-url`),
         USER_POOL_CLIENT_ID: cdk.Fn.importValue(`${props.appName}-${props.stage}-user-pool-client-id`)
       }
+      , retryAttempts: 0
     });
 
     // API Gateway統合 - Low-levelリソースを使用

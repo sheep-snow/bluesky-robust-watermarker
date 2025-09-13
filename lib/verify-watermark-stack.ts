@@ -75,13 +75,14 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
             }),
             role: lambdaRole,
             ...ResourcePolicy.getLambdaDefaults(props.stage),
-            timeout: cdk.Duration.minutes(15),  // Increased from 5 to 15 minutes
-            memorySize: 2048,  // Increased memory for better performance
+            timeout: cdk.Duration.minutes(5),
+            memorySize: 4096,  // Increased memory for better performance
             logGroup: verifyWatermarkLogGroup,
+            retryAttempts: 0,
             environment: {
                 APP_NAME: props.appName,
                 DOMAIN_NAME: process.env.DOMAIN_NAME || 'brw-example.app',
-                CLOUDFRONT_DOMAIN: cdk.Fn.importValue('chronico-dev-cloudfront-domain-name'),
+                CLOUDFRONT_DOMAIN: cdk.Fn.importValue(`${props.appName}-dev-cloudfront-domain-name`),
                 PROVENANCE_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
                 PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
                 PROVENANCE_PUBLIC_BUCKET_NAME: props.paramsResourceStack.provenancePublicBucket.bucketName,
@@ -108,10 +109,11 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
             timeout: cdk.Duration.seconds(30),
             memorySize: 256,
             logGroup: checkResultLogGroup,
+            retryAttempts: 0,
             environment: {
                 APP_NAME: props.appName,
                 DOMAIN_NAME: process.env.DOMAIN_NAME || 'brw-example.app',
-                CLOUDFRONT_DOMAIN: cdk.Fn.importValue('chronico-dev-cloudfront-domain-name'),
+                CLOUDFRONT_DOMAIN: cdk.Fn.importValue(`${props.appName}-dev-cloudfront-domain-name`),
                 STAGE: props.stage,
                 VERIFICATION_RESULTS_TABLE: verificationResultsTable.tableName
             }

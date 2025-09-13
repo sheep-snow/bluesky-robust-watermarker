@@ -1,12 +1,14 @@
 // DaisyUI共通UIフレームワーク
 const APP_NAME = process.env.APP_NAME || 'brw';
 
-export const getDaisyUIHead = () => `
+export const getDaisyUIHead = (domainName?: string) => {
+  const cssUrl = domainName ? `https://${domainName}/tailwind.min.css` : '/tailwind.min.css';
+  return `
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="${cssUrl}" rel="stylesheet" type="text/css" />
 `;
+};
 
 export const getThemeScript = () => `
   <script>
@@ -106,17 +108,16 @@ export const getFooter = () => `
     </nav>
     <aside>
       <p>© 2025 ${APP_NAME} - Image Provenance Service</p>
-      <p>Helping creators prove the authenticity of their work</p>
     </aside>
   </footer>
 `;
 
-export const wrapWithLayout = (title: string, content: string, currentPage: string = '') => `
+export const wrapWithLayout = (title: string, content: string, currentPage: string = '', domainName?: string) => `
   <!DOCTYPE html>
   <html data-theme="cupcake">
   <head>
     <title>${title}</title>
-    ${getDaisyUIHead()}
+    ${getDaisyUIHead(domainName)}
     ${getThemeScript()}
   </head>
   <body class="min-h-screen flex flex-col">

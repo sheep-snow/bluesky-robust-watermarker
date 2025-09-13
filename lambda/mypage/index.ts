@@ -52,8 +52,8 @@ async function generateEmptyProvenanceList(userInfo: any) {
     <title>${APP_NAME} - ${userInfo.blueskyUserId} Provenance List</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
     <script>
       function initTheme() {
         const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
@@ -347,8 +347,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         <title>${APP_NAME} - My Page</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-        <script src="https://cdn.tailwindcss.com"></script>
+        
+        <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
         <script>
           function initTheme() {
             const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
@@ -369,8 +369,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           <div class="navbar-center hidden lg:flex">
             <ul class="menu menu-horizontal px-1">
               <li><a href="/">Home</a></li>
-              <li><a href="/signup">Sign Up</a></li>
-              <li><a href="/login">Login</a></li>
+              <li id="signupNavItem"><a href="/signup">Sign Up</a></li>
+              <li id="loginNavItem"><a href="/login">Login</a></li>
               <li><a href="/mypage" class="active">My Page</a></li>
               <li><a href="/verify-watermark">Verify</a></li>
             </ul>
@@ -396,7 +396,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             <div class="hero-content text-center py-12">
               <div class="max-w-md">
                 <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
-                <p class="mb-5 text-lg">Manage your Bluesky settings and create posts</p>
+                <p class="mb-5 text-lg">Blueskyの設定を管理し、作品を投稿する</p>
               </div>
             </div>
           </div>
@@ -412,10 +412,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 gap-8">
               <div class="card bg-base-100 shadow-xl">
                 <div class="card-body">
-                  <h2 class="card-title text-2xl mb-4">🔗 Bluesky Settings</h2>
+                  <h2 class="card-title text-2xl mb-4">🔗 Bluesky 設定</h2>
                   <form id="settingsForm" class="space-y-4">
                     <div class="form-control">
                       <label class="label">
@@ -429,20 +429,20 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                       </label>
                       <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
                     </div>
-                    <button type="submit" class="btn btn-primary w-full">Save Settings</button>
+                    <button type="submit" class="btn btn-primary w-full">保存</button>
                   </form>
                 </div>
               </div>
               
               <div class="card bg-base-100 shadow-xl">
                 <div class="card-body">
-                  <h2 class="card-title text-2xl mb-4">✍️ Create Post</h2>
+                  <h2 class="card-title text-2xl mb-4">✍️ 作品を投稿</h2>
                   <form id="postForm" class="space-y-4">
                     <div class="form-control">
                       <label class="label">
                         <span class="label-text font-semibold">Post Text</span>
                       </label>
-                      <textarea id="postText" rows="4" placeholder="What's happening?" class="textarea textarea-bordered"></textarea>
+                      <textarea id="postText" rows="4" placeholder="投稿文..." class="textarea textarea-bordered"></textarea>
                     </div>
                     <div class="form-control">
                       <label class="label">
@@ -450,7 +450,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                       </label>
                       <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
                     </div>
-                    <button type="submit" class="btn btn-accent w-full">Create Post</button>
+                    <button type="submit" class="btn btn-accent w-full">投稿</button>
                   </form>
                 </div>
               </div>
@@ -519,11 +519,22 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           
           if (!accessToken || !idToken) {
             document.getElementById('authStatus').innerHTML = 
-              '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><span>Not authenticated. <a href="/signup" class="link">Please sign up</a> or <a href="/login" class="link">login</a>.</span>';
+              '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><span>まだログインしていません。 <a href="/signup" class="link">サインアップしてください。</a> or <a href="/login" class="link">login</a>.</span>';
             document.getElementById('authStatus').className = 'alert alert-warning';
           } else {
             document.getElementById('authStatus').classList.add('hidden');
             document.getElementById('content').classList.remove('hidden');
+            
+            // Hide signup/login buttons when user is logged in
+            const signupNavItem = document.getElementById('signupNavItem');
+            const loginNavItem = document.getElementById('loginNavItem');
+            const signupFooterLink = document.getElementById('signupFooterLink');
+            const loginFooterLink = document.getElementById('loginFooterLink');
+            
+            if (signupNavItem) signupNavItem.style.display = 'none';
+            if (loginNavItem) loginNavItem.style.display = 'none';
+            if (signupFooterLink) signupFooterLink.style.display = 'none';
+            if (loginFooterLink) loginFooterLink.style.display = 'none';
             
             // Load existing user info
             loadUserInfo();
@@ -531,26 +542,31 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             // Settings form submission
             document.getElementById('settingsForm').addEventListener('submit', async (e) => {
               e.preventDefault();
+              
               const data = {
                 blueskyUserId: document.getElementById('blueskyUserId').value,
                 blueskyAppPassword: document.getElementById('blueskyAppPassword').value
               };
               
-              const response = await fetch('/mypage', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + accessToken
-                },
-                body: JSON.stringify(data)
-              });
-              
-              if (response.ok) {
-                alert('Settings saved and validated successfully!');
-                loadUserInfo();
-              } else {
-                const errorData = await response.json();
-                alert('Failed to save settings: ' + (errorData.error || 'Unknown error'));
+              try {
+                const response = await fetch('/mypage', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + accessToken
+                  },
+                  body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                  alert('Settings saved and validated successfully!');
+                  loadUserInfo();
+                } else {
+                  const errorData = await response.json();
+                  alert('設定の保存に失敗しました: ' + (errorData.error || 'Unknown error'));
+                }
+              } catch (error) {
+                alert('Network error: ' + error.message);
               }
             });
             
@@ -597,7 +613,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                 checkProvenanceGeneration(result.postId);
               } else {
                 const errorData = await response.json();
-                alert('Failed to create post: ' + (errorData.error || 'Unknown error'));
+                alert('投稿に失敗しました: ' + (errorData.error || 'Unknown error'));
               }
             });
           }
@@ -719,8 +735,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
           <nav class="grid grid-flow-col gap-4">
             <a href="/" class="link link-hover">Home</a>
-            <a href="/signup" class="link link-hover">Sign Up</a>
-            <a href="/login" class="link link-hover">Login</a>
+            <a id="signupFooterLink" href="/signup" class="link link-hover">Sign Up</a>
+            <a id="loginFooterLink" href="/login" class="link link-hover">Login</a>
             <a href="/mypage" class="link link-hover">My Page</a>
             <a href="/verify-watermark" class="link link-hover">Verify</a>
           </nav>
@@ -831,13 +847,13 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           return { statusCode: 200, headers, body: JSON.stringify({ postId, message: 'Post queued successfully' }) };
         } catch (error) {
           console.error('Post creation error:', error);
-          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to create post' }) };
+          return { statusCode: 500, headers, body: JSON.stringify({ error: '投稿に失敗しました' }) };
         }
       } else {
         // Handle settings update
         try {
           if (!event.body) {
-            return { statusCode: 400, headers, body: JSON.stringify({ error: 'Request body is required' }) };
+            return { statusCode: 400, headers, body: JSON.stringify({ error: '投稿内容は必須です' }) };
           }
 
           const rawBody = JSON.parse(event.body);
@@ -907,10 +923,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             }
           }
 
-          return { statusCode: 200, headers, body: JSON.stringify({ message: 'Settings saved and validated successfully' }) };
+          return { statusCode: 200, headers, body: JSON.stringify({ message: '設定を保存しました' }) };
         } catch (error) {
           console.error('Save settings error:', error);
-          return { statusCode: 500, headers, body: JSON.stringify({ error: 'Failed to save settings' }) };
+          return { statusCode: 500, headers, body: JSON.stringify({ error: '設定の保存に失敗しました' }) };
         }
       }
     }

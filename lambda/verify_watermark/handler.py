@@ -123,7 +123,7 @@ def process_watermark_async(verification_id: str, image_data: bytes):
 
                     req = Request(provenance_url)
                     req.add_header(
-                        "User-Agent", "Mozilla/5.0 (compatible; chronico-verifier)"
+                        "User-Agent", f"Mozilla/5.0 (compatible; {APP_NAME}-verifier)"
                     )
 
                     with urlopen(req, timeout=30) as response:
@@ -431,8 +431,8 @@ def generate_upload_form_html() -> str:
     <title>{APP_NAME} - 透かし検証</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
     <script>
       function initTheme() {{
         const savedTheme = localStorage.getItem('{app_name_lower}-theme') || 'cupcake';
@@ -496,7 +496,7 @@ def generate_upload_form_html() -> str:
                ondragenter="handleDragEnter(event)" 
                ondragleave="handleDragLeave(event)">
             <input type="file" id="file-input" accept="image/*" onchange="handleFileSelect(event)" class="hidden">
-            <div class="text-6xl mb-4">📷</div>
+            <div class="text-6xl mb-4">🎨</div>
             <label for="file-input" class="btn btn-primary mb-4">画像をアップロード</label>
             <p class="text-base-content/70">または画像をここにドラッグ&ドロップ</p>
             <p class="text-sm text-base-content/50 mt-2">対応形式: JPEG, PNG, WebP</p>

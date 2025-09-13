@@ -1,4 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -100,7 +101,11 @@ export class ParamsResourceStack extends cdk.Stack {
       })],
       destinationBucket: this.provenancePublicBucket,
       prune: false  // 他のファイルを削除しない
-    });    // SSMパラメータとして共有値を保存
+    });
+
+    // CloudFront OAC用のS3バケットポリシーは後でauth-backend-stackから設定
+
+    // SSMパラメータとして共有値を保存
     new ssm.StringParameter(this, 'DomainNameParam', {
       parameterName: `/${props.appName}/${props.stage}/domain-name`,
       stringValue: this.domainName

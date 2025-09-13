@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DaisyUI components are automatically included when using Tailwind CSS */

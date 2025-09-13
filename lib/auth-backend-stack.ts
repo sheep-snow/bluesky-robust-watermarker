@@ -4,7 +4,10 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import { ParamsResourceStack } from './params-resource-stack';
@@ -138,8 +141,28 @@ export class AuthBackendStack extends cdk.Stack {
       cookieBehavior: cloudfront.CacheCookieBehavior.none()
     });
 
-    // CloudFront Distribution (単一API Gateway Origin)
+    // S3バケット（静的ファイル用）
+    const staticFilesBucket = new s3.Bucket(this, 'StaticFilesBucket', {
+      bucketName: `${props.appName}-${props.stage}-static-files`,
+      publicReadAccess: false,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true
+    });
+
+    // 静的ファイル（favicon.ico、CSS）をS3にデプロイ
+    new s3deploy.BucketDeployment(this, 'DeployStaticFiles', {
+      sources: [
+        s3deploy.Source.asset('./static', {
+          exclude: ['tailwind.css'] // ビルド前のファイルは除外
+        })
+      ],
+      destinationBucket: staticFilesBucket
+    });
+
+    // CloudFront Distribution (API Gateway + S3 Origins)
     const apiOrigin = new origins.RestApiOrigin(this.api);
+    const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(staticFilesBucket);
 
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
@@ -191,6 +214,22 @@ export class AuthBackendStack extends cdk.Stack {
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
           cachePolicy: cachePolicy,
           originRequestPolicy: originRequestPolicy
+        },
+        // Favicon (S3経由)
+        'favicon.ico': {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+          cachePolicy: s3CachePolicy
+        },
+        // CSSファイル (S3経由)
+        '*.css': {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+          cachePolicy: s3CachePolicy
         },
         // User list pages (S3オリジン)
         'users/*': {
