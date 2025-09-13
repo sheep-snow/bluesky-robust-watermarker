@@ -123,7 +123,7 @@ export const handler = async (event: any) => {
             <h2 class="mb-5 text-2xl font-bold">${userInfo.blueskyUserId}</h2>
             <p class="mb-5 text-lg">Verified image provenance records</p>
             <div class="flex gap-4 justify-center">
-              <a href="/mypage" class="btn btn-outline btn-primary">← Back to My Page</a>
+              <a href="/mypage" class="btn btn-soft btn-primary">← Back to My Page</a>
             </div>
           </div>
         </div>
@@ -134,7 +134,7 @@ export const handler = async (event: any) => {
         <div class="card-body">
           <h3 class="card-title text-primary">📋 Post ${post.postId}</h3>
           <div class="flex flex-wrap gap-2 mb-4">
-            <div class="badge badge-outline">Created: ${new Date(post.createdAt).toLocaleString()}</div>
+            <div class="badge badge-soft">Created: ${new Date(post.createdAt).toLocaleString()}</div>
             <div class="badge badge-secondary">ID: ${post.postId}</div>
           </div>
           ${post.text ? `

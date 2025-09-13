@@ -104,7 +104,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                     </a>
                     <div class="divider">OR</div>
                     <p class="text-sm text-base-content/70">Don't have an account?</p>
-                    <a href="/signup" class="btn btn-outline">サインアップ</a>
+                    <a href="/signup" class="btn btn-soft">サインアップ</a>
                   </div>
                 </div>
               </div>

@@ -87,7 +87,7 @@ export const handler = async (event: any) => {
             <h1 class="mb-5 text-4xl font-bold">🔍 Image Provenance</h1>
             <p class="mb-5 text-lg">Verified image provenance information</p>
             <div class="flex gap-4 justify-center">
-              <a href="/mypage" class="btn btn-outline btn-primary">← Back to My Page</a>
+              <a href="/mypage" class="btn btn-soft btn-primary">← Back to My Page</a>
               <a href="/users/${userInfo.provenancePageId}.html" class="btn btn-accent">← Provenance List</a>
             </div>
           </div>

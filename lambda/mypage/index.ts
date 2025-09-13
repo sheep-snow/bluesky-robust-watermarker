@@ -102,7 +102,7 @@ async function generateEmptyProvenanceList(userInfo: any) {
             <h2 class="mb-5 text-2xl font-bold">${userInfo.blueskyUserId}</h2>
             <p class="mb-5 text-lg">Verified image provenance records</p>
             <div class="flex gap-4 justify-center">
-              <a href="/mypage" class="btn btn-outline btn-primary">← Back to My Page</a>
+              <a href="/mypage" class="btn btn-soft btn-primary">← Back to My Page</a>
             </div>
           </div>
         </div>
@@ -408,7 +408,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           
           <div id="content" class="hidden">
             <div class="flex justify-end mb-6 gap-4">
-              <a href="#" id="provenanceListLink" class="btn btn-outline hidden">View My Provenance List</a>
+              <a href="#" id="provenanceListLink" class="btn btn-soft hidden">View My Provenance List</a>
               <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
             </div>
             

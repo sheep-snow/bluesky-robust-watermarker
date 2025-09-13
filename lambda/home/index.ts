@@ -76,8 +76,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               <p class="mb-5 text-xl">Bluesky に投稿する画像の来歴証明サービス</p>
               <div class="flex gap-4 justify-center items-center" id="hero-actions">
                 <a href="/signup" class="btn btn-accent btn-lg" id="hero-signup">Get Started</a>
-                <a href="/login" class="btn btn-outline btn-lg" id="hero-login">Login</a>
-                <a href="/verify-watermark" class="btn btn-outline btn-lg" id="hero-verify">Verify</a>
+                <a href="/login" class="btn btn-soft btn-lg" id="hero-login">Login</a>
+                <a href="/verify-watermark" class="btn btn-soft btn-lg" id="hero-verify">Verify</a>
               </div>
               <div class="hidden" id="hero-authenticated">
                 <a href="/mypage" class="btn btn-primary btn-lg">Go to My Page</a>
