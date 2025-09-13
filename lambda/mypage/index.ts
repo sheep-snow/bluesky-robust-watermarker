@@ -52,8 +52,8 @@ async function generateEmptyProvenanceList(userInfo: any) {
     <title>${APP_NAME} - ${userInfo.blueskyUserId} Provenance List</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
     <script>
       function initTheme() {
         const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';
@@ -347,8 +347,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         <title>${APP_NAME} - My Page</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-        <script src="https://cdn.tailwindcss.com"></script>
+        
+        <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
         <script>
           function initTheme() {
             const savedTheme = localStorage.getItem('${APP_NAME.toLowerCase()}-theme') || 'cupcake';

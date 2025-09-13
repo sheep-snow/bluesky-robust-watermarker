@@ -150,11 +150,13 @@ export class AuthBackendStack extends cdk.Stack {
       autoDeleteObjects: true
     });
 
-    // favicon.icoをS3にデプロイ
+    // 静的ファイル（favicon.ico、CSS）をS3にデプロイ
     new s3deploy.BucketDeployment(this, 'DeployStaticFiles', {
-      sources: [s3deploy.Source.asset('.', {
-        exclude: ['*', '!favicon.ico']
-      })],
+      sources: [
+        s3deploy.Source.asset('./static', {
+          exclude: ['tailwind.css'] // ビルド前のファイルは除外
+        })
+      ],
       destinationBucket: staticFilesBucket
     });
 
@@ -215,6 +217,14 @@ export class AuthBackendStack extends cdk.Stack {
         },
         // Favicon (S3経由)
         'favicon.ico': {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+          cachePolicy: s3CachePolicy
+        },
+        // CSSファイル (S3経由)
+        '*.css': {
           origin: s3Origin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,

@@ -431,8 +431,8 @@ def generate_upload_form_html() -> str:
     <title>{APP_NAME} - 透かし検証</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
     <script>
       function initTheme() {{
         const savedTheme = localStorage.getItem('{app_name_lower}-theme') || 'cupcake';
