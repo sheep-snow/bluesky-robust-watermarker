@@ -496,7 +496,7 @@ def generate_upload_form_html() -> str:
                ondragenter="handleDragEnter(event)" 
                ondragleave="handleDragLeave(event)">
             <input type="file" id="file-input" accept="image/*" onchange="handleFileSelect(event)" class="hidden">
-            <div class="text-6xl mb-4">📷</div>
+            <div class="text-6xl mb-4">🎨</div>
             <label for="file-input" class="btn btn-primary mb-4">画像をアップロード</label>
             <p class="text-base-content/70">または画像をここにドラッグ&ドロップ</p>
             <p class="text-sm text-base-content/50 mt-2">対応形式: JPEG, PNG, WebP</p>

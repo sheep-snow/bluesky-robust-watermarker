@@ -230,6 +230,47 @@ export class AuthBackendStack extends cdk.Stack {
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
           cachePolicy: s3CachePolicy
+        },
+        // User list pages (S3オリジン)
+        'users/*': {
+          origin: new origins.S3Origin(props.paramsResourceStack.provenancePublicBucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+          cachePolicy: s3CachePolicy
+        },
+        // Provenance pages (S3オリジン) - 投稿IDのパスパターン
+        'provenance/*': {
+          origin: new origins.S3Origin(props.paramsResourceStack.provenancePublicBucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+          cachePolicy: s3CachePolicy,
+          // ディレクトリパスでのアクセス時にindex.htmlを自動追加するFunction
+          functionAssociations: [{
+            function: new cloudfront.Function(this, 'IndexRewriteFunction', {
+              functionName: `${props.appName}-${props.stage}-index-rewrite`,
+              code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
+    
+    // URIが/で終わる場合、index.htmlを追加
+    if (uri.endsWith('/')) {
+        request.uri += 'index.html';
+    }
+    // URIがディレクトリ名のみの場合（拡張子なし）、/index.htmlを追加  
+    else if (!uri.includes('.')) {
+        request.uri += '/index.html';
+    }
+    
+    return request;
+}
+              `),
+              comment: 'Rewrite directory requests to index.html'
+            }),
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
+          }]
         }
       },
       domainNames: [props.paramsResourceStack.domainName],
