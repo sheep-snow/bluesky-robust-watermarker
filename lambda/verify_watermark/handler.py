@@ -422,63 +422,175 @@ async def get_provenance_data(post_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def generate_upload_form_html() -> str:
-    """Generate the HTML form for watermark verification."""
+def wrapWithLayout(
+    title: str, content: str, currentPage: str = "", domainName: str = None
+) -> str:
+    """Wrap content with DaisyUI layout."""
+    css_url = (
+        f"https://{domainName}/tailwind.min.css" if domainName else "/tailwind.min.css"
+    )
     app_name_lower = APP_NAME.lower()
+
     return f"""<!DOCTYPE html>
 <html data-theme="cupcake">
 <head>
-    <title>{APP_NAME} - 透かし検証</title>
+    <title>{title}</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <link href="/tailwind.min.css" rel="stylesheet" type="text/css" />
+    <link href="{css_url}" rel="stylesheet" type="text/css" />
     <script>
-      function initTheme() {{
-        const savedTheme = localStorage.getItem('{app_name_lower}-theme') || 'cupcake';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-      }}
-      function changeTheme(theme) {{
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('{app_name_lower}-theme', theme);
-      }}
-      document.addEventListener('DOMContentLoaded', initTheme);
+        const THEMES = [
+            'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate', 
+            'synthwave', 'retro', 'cyberpunk', 'valentine', 'halloween', 'garden',
+            'forest', 'aqua', 'lofi', 'pastel', 'fantasy', 'wireframe', 'black',
+            'luxury', 'dracula', 'cmyk', 'autumn', 'business', 'acid', 'lemonade',
+            'night', 'coffee', 'winter', 'dim', 'nord', 'sunset'
+        ];
+        
+        function initTheme() {{
+            const savedTheme = localStorage.getItem('{app_name_lower}-theme') || 'cupcake';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }}
+        
+        function changeTheme(theme) {{
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('{app_name_lower}-theme', theme);
+        }}
+        
+        function logout() {{
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('refresh_token');
+            window.location.href = '/';
+        }}
+        
+        document.addEventListener('DOMContentLoaded', initTheme);
     </script>
 </head>
-<body class="min-h-screen flex flex-col bg-base-200">
+<body class="min-h-screen flex flex-col">
     <div class="navbar bg-base-100 shadow-lg">
-      <div class="navbar-start">
-        <a href="/" class="btn btn-ghost text-xl">📄 {APP_NAME}</a>
-      </div>
-      <div class="navbar-center hidden lg:flex">
-        <ul class="menu menu-horizontal px-1">
-          <li><a href="/">Home</a></li>
-          <li><a href="/signup" id="nav-signup">Sign Up</a></li>
-          <li><a href="/login" id="nav-login">Login</a></li>
-          <li><a href="/verify-watermark" class="active">Verify Watermark</a></li>
-          <li><a href="/mypage" id="nav-mypage">My Page</a></li>
-        </ul>
-      </div>
-      <div class="navbar-end">
-        <div class="hidden" id="auth-actions">
-          <button onclick="logout()" class="btn btn-error btn-sm mr-2">Logout</button>
+        <div class="navbar-start">
+            <div class="dropdown">
+                <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
+                    </svg>
+                </div>
+                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                    <li><a href="/" class="{"active" if currentPage == "home" else ""}">Home</a></li>
+                    <li><a href="/signup" class="{"active" if currentPage == "signup" else ""}">Sign Up</a></li>
+                    <li><a href="/login" class="{"active" if currentPage == "login" else ""}">Login</a></li>
+                    <li><a href="/mypage" class="{"active" if currentPage == "mypage" else ""}">My Page</a></li>
+                    <li><a href="/verify-watermark" class="{"active" if currentPage == "verify-watermark" else ""}">Verify</a></li>
+                </ul>
+            </div>
+            <a href="/" class="btn btn-ghost text-xl">{APP_NAME}</a>
         </div>
-        <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost">
-            Theme
-            <svg width="12px" height="12px" class="h-2 w-2 fill-current opacity-60 inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="m1799 349 242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
-          </div>
-          <ul tabindex="0" class="dropdown-content z-[1] p-2 shadow-2xl bg-base-300 rounded-box w-52">
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Cupcake" value="cupcake" onclick="changeTheme('cupcake')"/></li>
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Dark" value="dark" onclick="changeTheme('dark')"/></li>
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Emerald" value="emerald" onclick="changeTheme('emerald')"/></li>
-            <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Corporate" value="corporate" onclick="changeTheme('corporate')"/></li>
-          </ul>
+        <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1">
+                <li><a href="/" class="{"active" if currentPage == "home" else ""}">Home</a></li>
+                <li><a href="/signup" class="{"active" if currentPage == "signup" else ""}">Sign Up</a></li>
+                <li><a href="/login" class="{"active" if currentPage == "login" else ""}">Login</a></li>
+                <li><a href="/mypage" class="{"active" if currentPage == "mypage" else ""}">My Page</a></li>
+                <li><a href="/verify-watermark" class="{"active" if currentPage == "verify-watermark" else ""}">Verify</a></li>
+            </ul>
         </div>
-      </div>
+        <div class="navbar-end">
+            <div class="hidden" id="auth-actions">
+                <button onclick="logout()" class="btn btn-error btn-sm mr-2">Logout</button>
+            </div>
+            <div class="dropdown dropdown-end">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto">
+                    <li class="menu-title">Choose Theme</li>
+                    <li><a onclick="changeTheme('light')">🌞 Light</a></li>
+                    <li><a onclick="changeTheme('dark')">🌙 Dark</a></li>
+                    <li><a onclick="changeTheme('cupcake')">🧁 Cupcake</a></li>
+                    <li><a onclick="changeTheme('bumblebee')">🐝 Bumblebee</a></li>
+                    <li><a onclick="changeTheme('emerald')">💎 Emerald</a></li>
+                    <li><a onclick="changeTheme('corporate')">🏢 Corporate</a></li>
+                    <li><a onclick="changeTheme('synthwave')">🌆 Synthwave</a></li>
+                    <li><a onclick="changeTheme('retro')">📻 Retro</a></li>
+                    <li><a onclick="changeTheme('cyberpunk')">🤖 Cyberpunk</a></li>
+                    <li><a onclick="changeTheme('valentine')">💝 Valentine</a></li>
+                    <li><a onclick="changeTheme('halloween')">🎃 Halloween</a></li>
+                    <li><a onclick="changeTheme('garden')">🌸 Garden</a></li>
+                    <li><a onclick="changeTheme('forest')">🌲 Forest</a></li>
+                    <li><a onclick="changeTheme('aqua')">🌊 Aqua</a></li>
+                    <li><a onclick="changeTheme('lofi')">🎵 Lofi</a></li>
+                    <li><a onclick="changeTheme('pastel')">🎨 Pastel</a></li>
+                    <li><a onclick="changeTheme('fantasy')">🦄 Fantasy</a></li>
+                    <li><a onclick="changeTheme('wireframe')">📐 Wireframe</a></li>
+                    <li><a onclick="changeTheme('black')">⚫ Black</a></li>
+                    <li><a onclick="changeTheme('luxury')">💰 Luxury</a></li>
+                    <li><a onclick="changeTheme('dracula')">🧛 Dracula</a></li>
+                    <li><a onclick="changeTheme('cmyk')">🎨 CMYK</a></li>
+                    <li><a onclick="changeTheme('autumn')">🍂 Autumn</a></li>
+                    <li><a onclick="changeTheme('business')">💼 Business</a></li>
+                    <li><a onclick="changeTheme('acid')">🧪 Acid</a></li>
+                    <li><a onclick="changeTheme('lemonade')">🍋 Lemonade</a></li>
+                    <li><a onclick="changeTheme('night')">🌃 Night</a></li>
+                    <li><a onclick="changeTheme('coffee')">☕ Coffee</a></li>
+                    <li><a onclick="changeTheme('winter')">❄️ Winter</a></li>
+                    <li><a onclick="changeTheme('dim')">🔅 Dim</a></li>
+                    <li><a onclick="changeTheme('nord')">🏔️ Nord</a></li>
+                    <li><a onclick="changeTheme('sunset')">🌅 Sunset</a></li>
+                </ul>
+            </div>
+        </div>
     </div>
-    
-    <div class="container mx-auto px-4 py-8 flex-1">
+    <main class="flex-1 container mx-auto px-4 py-8">
+        {content}
+    </main>
+    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+        <aside>
+            <p>© 2025 {APP_NAME} - Image Provenance Service</p>
+        </aside>
+    </footer>
+    <script>
+        function checkAuthAndUpdateNav() {{
+            const accessToken = localStorage.getItem('access_token');
+            const idToken = localStorage.getItem('id_token');
+            const isAuthenticated = accessToken && idToken;
+            
+            const signupLinks = document.querySelectorAll('a[href="/signup"]');
+            const loginLinks = document.querySelectorAll('a[href="/login"]');
+            const authActions = document.getElementById('auth-actions');
+            
+            signupLinks.forEach(link => {{
+                if (link.closest('li')) {{
+                    link.closest('li').style.display = isAuthenticated ? 'none' : '';
+                }} else {{
+                    link.style.display = isAuthenticated ? 'none' : '';
+                }}
+            }});
+            
+            loginLinks.forEach(link => {{
+                if (link.closest('li')) {{
+                    link.closest('li').style.display = isAuthenticated ? 'none' : '';
+                }} else {{
+                    link.style.display = isAuthenticated ? 'none' : '';
+                }}
+            }});
+            
+            if (authActions) {{
+                authActions.classList.toggle('hidden', !isAuthenticated);
+            }}
+        }}
+        
+        document.addEventListener('DOMContentLoaded', checkAuthAndUpdateNav);
+    </script>
+</body>
+</html>"""
+
+
+def generate_upload_form_html() -> str:
+    """Generate the HTML form for watermark verification."""
+    content = f"""
       <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
         <div class="hero-content text-center py-12">
           <div class="max-w-md">
@@ -530,14 +642,6 @@ def generate_upload_form_html() -> str:
       </div>
       
       <div id="result" class="hidden mt-8"></div>
-    </div>
-    
-    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
-      <div>
-        <a href="/" class="btn btn-ghost">📄 {APP_NAME} Home</a>
-        <p class="mt-2">Copyright © 2025 - All right reserved by {APP_NAME}</p>
-      </div>
-    </footer>
 
     <script>
         let selectedFile = null;
@@ -644,38 +748,12 @@ def generate_upload_form_html() -> str:
                 btn.disabled = false;
             }}
         }}
-        
-        // Check authentication status and update UI
-        function checkAuthAndUpdateUI() {{
-          const accessToken = localStorage.getItem('access_token');
-          const idToken = localStorage.getItem('id_token');
-          const isAuthenticated = accessToken && idToken;
-          
-          if (isAuthenticated) {{
-            document.getElementById('nav-signup').style.display = 'none';
-            document.getElementById('nav-login').style.display = 'none';
-            document.getElementById('auth-actions').classList.remove('hidden');
-          }} else {{
-            document.getElementById('nav-signup').style.display = 'block';
-            document.getElementById('nav-login').style.display = 'block';
-            document.getElementById('auth-actions').classList.add('hidden');
-          }}
-        }}
-        
-        function logout() {{
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('id_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/';
-        }}
-        
-        document.addEventListener('DOMContentLoaded', function() {{
-          initTheme();
-          checkAuthAndUpdateUI();
-        }});
     </script>
-</body>
-</html>"""
+    """
+
+    return wrapWithLayout(
+        f"{APP_NAME} - 透かし検証", content, "verify-watermark", DOMAIN_NAME
+    )
 
 
 def generate_error_page(message: str) -> str:

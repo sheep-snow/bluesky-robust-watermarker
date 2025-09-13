@@ -32,7 +32,7 @@ export const handler = async (event: any) => {
         <div class="hero-content text-center py-12">
           <div class="max-w-md">
             <h1 class="mb-5 text-4xl font-bold">🔍 Image Provenance</h1>
-            <p class="mb-5 text-lg">Verified image provenance information</p>
+            <p class="mb-5 text-lg">来歴</p>
             <div class="flex gap-4 justify-center">
               <a href="/mypage" class="btn btn-soft btn-primary">← Back to My Page</a>
               <a href="/users/${userInfo.provenancePageId}.html" class="btn btn-accent">← Provenance List</a>
@@ -43,7 +43,7 @@ export const handler = async (event: any) => {
     
       <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
-          <h2 class="card-title text-2xl text-primary">📋 Post Information</h2>
+          <h2 class="card-title text-2xl text-primary">📋 Bluesky 投稿の情報</h2>
           <div class="overflow-x-auto">
             <table class="table table-zebra">
               <tbody>
@@ -78,7 +78,7 @@ export const handler = async (event: any) => {
       ${postData.text ? `
       <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
-          <h3 class="card-title text-xl text-primary">💬 Post Text</h3>
+          <h3 class="card-title text-xl text-primary">💬 投稿文</h3>
           <div class="card bg-base-200 p-4">
             <p class="text-base-content">${postData.text}</p>
           </div>
@@ -89,7 +89,7 @@ export const handler = async (event: any) => {
       ${event.hasWatermarkedImage || event.hasProcessedImage ? `
       <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
-          <h3 class="card-title text-xl text-primary">🖼️ Verified Image</h3>
+          <h3 class="card-title text-xl text-primary">🖼️ 透かし埋込済画像</h3>
           <div class="text-center">
             <img src="/provenance/${postId}/image.${postData.imageExtension || 'jpg'}" alt="Post image" class="max-w-full h-auto rounded-lg shadow-md" />
           </div>
@@ -152,7 +152,7 @@ export const handler = async (event: any) => {
         document.addEventListener('DOMContentLoaded', checkAuthAndUpdateUI);
       </script>
     `;
-    
+
     const provenanceHtml = wrapWithLayout(`${APP_NAME} - Provenance for Post ${postId}`, content, 'provenance');
 
     // Save provenance page to public bucket

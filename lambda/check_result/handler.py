@@ -139,8 +139,8 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
         <h1>✅ 透かしが見つかりました</h1>
         <div class="success">この画像には {APP_NAME} の透かしが埋め込まれています</div>
         <p>透かしID: {extracted_id}</p>
-        <p>来歴情報が利用可能です。</p>
-        <a href="{provenance_url}" class="provenance-btn">来歴情報を確認</a>
+        <p>来歴が利用可能です。</p>
+        <a href="{provenance_url}" class="provenance-btn">来歴を確認</a>
         <br>
         <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>
@@ -163,7 +163,7 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
 <body>
     <div class="container">
         <h1>⚠️ 透かしは見つかりましたが...</h1>
-        <div class="warning">この透かしに対応する来歴情報が見つかりませんでした</div>
+        <div class="warning">この透かしに対応する来歴が見つかりませんでした</div>
         <p>透かしID: {extracted_id}</p>
         <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
     </div>

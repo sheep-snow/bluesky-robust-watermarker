@@ -43,18 +43,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       </div>
     </div>
 
-    <div class="card bg-base-100 shadow-xl mb-8">
-      <div class="card-body">
-        <h2 class="card-title text-2xl mb-4">How It Works</h2>
-        <div class="steps steps-vertical lg:steps-horizontal">
-          <div class="step step-primary"><a href="/signup">Sign Up</a></div>
-          <div class="step step-primary"><a href="/mypage">Connect Bluesky</a></div>
-          <div class="step step-primary"><a href="/mypage">Post to Bluesky</a></div>
-          <div class="step step-primary"><a href="/verify-watermark">Verification</a></div>
-        </div>
-      </div>
-    </div>
-    
     <script>
       // Check authentication status and update UI
       function checkAuthAndUpdateUI() {
@@ -86,7 +74,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       document.addEventListener('DOMContentLoaded', checkAuthAndUpdateUI);
     </script>
   `;
-  
+
   const html = wrapWithLayout(`${APP_NAME} - Image Provenance Service`, content, 'home');
 
   return { statusCode: 200, headers, body: html };

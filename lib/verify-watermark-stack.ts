@@ -76,7 +76,7 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
             role: lambdaRole,
             ...ResourcePolicy.getLambdaDefaults(props.stage),
             timeout: cdk.Duration.minutes(5),
-            memorySize: 2048,  // Increased memory for better performance
+            memorySize: 3008,  // Increased memory for better performance
             logGroup: verifyWatermarkLogGroup,
             retryAttempts: 0,
             environment: {
