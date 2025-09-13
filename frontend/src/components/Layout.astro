@@ -1,0 +1,67 @@
+---
+export interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <link href="/tailwind.min.css" rel="stylesheet" />
+  <script>
+    function initTheme() {
+      const savedTheme = localStorage.getItem('chronico-theme') || 'cupcake';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+    function changeTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('chronico-theme', theme);
+    }
+    document.addEventListener('DOMContentLoaded', initTheme);
+  </script>
+</head>
+<body class="min-h-screen flex flex-col bg-base-200">
+  <nav class="navbar bg-base-100 shadow-lg">
+    <div class="navbar-start">
+      <a href="/" class="btn btn-ghost text-xl">📄 Chronico</a>
+    </div>
+    <div class="navbar-center hidden lg:flex">
+      <ul class="menu menu-horizontal px-1">
+        <li><a href="/">Home</a></li>
+        <li><a href="/mypage">My Page</a></li>
+        <li><a href="/verify-watermark">Verify</a></li>
+      </ul>
+    </div>
+    <div class="navbar-end">
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-ghost">
+          Theme
+          <svg width="12px" height="12px" class="h-2 w-2 fill-current opacity-60 inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="m1799 349 242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
+        </div>
+        <ul tabindex="0" class="dropdown-content z-[1] p-2 shadow-2xl bg-base-300 rounded-box w-52">
+          <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Cupcake" value="cupcake" onclick="changeTheme('cupcake')"/></li>
+          <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Dark" value="dark" onclick="changeTheme('dark')"/></li>
+          <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Emerald" value="emerald" onclick="changeTheme('emerald')"/></li>
+          <li><input type="radio" name="theme-dropdown" class="theme-controller btn btn-sm btn-block btn-ghost justify-start" aria-label="Corporate" value="corporate" onclick="changeTheme('corporate')"/></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  
+  <main class="flex-1">
+    <slot />
+  </main>
+  
+  <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+    <div>
+      <a href="/" class="btn btn-ghost">🔍 Chronico Home</a>
+      <p class="mt-2">Copyright © 2025 - All right reserved by Chronico</p>
+    </div>
+  </footer>
+</body>
+</html>

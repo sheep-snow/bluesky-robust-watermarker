@@ -1,0 +1,57 @@
+---
+import Layout from '../components/Layout.astro';
+---
+
+<Layout title="Chronico - Bluesky Robust Watermarker">
+  <div class="container mx-auto px-4 py-8">
+    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+      <div class="hero-content text-center py-16">
+        <div class="max-w-md">
+          <h1 class="mb-5 text-5xl font-bold">📄 Chronico</h1>
+          <p class="mb-5 text-xl">Bluesky Robust Watermarker</p>
+          <p class="mb-8">画像に電子透かしを埋め込んでBlueskyへ投稿するクリエイター向けWebクライアント</p>
+          <div class="flex gap-4 justify-center">
+            <a href="/signup" class="btn btn-outline btn-primary">サインアップ</a>
+            <a href="/login" class="btn btn-primary">ログイン</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-8 mb-12">
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body text-center">
+          <div class="text-4xl mb-4">🔒</div>
+          <h2 class="card-title justify-center">来歴の証明</h2>
+          <p>誰が最初にその画像をBlueskyに投稿したかを検証します</p>
+        </div>
+      </div>
+      
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body text-center">
+          <div class="text-4xl mb-4">🛡️</div>
+          <h2 class="card-title justify-center">無断転載の抑止</h2>
+          <p>画像の出所を検証可能にすることで、不正な再投稿を抑制します</p>
+        </div>
+      </div>
+      
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body text-center">
+          <div class="text-4xl mb-4">✅</div>
+          <h2 class="card-title justify-center">信頼性向上</h2>
+          <p>投稿された画像の真正性を担保することで、ユーザー間の信頼を向上させます</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center">
+      <h2 class="text-3xl font-bold mb-8">使い方</h2>
+      <div class="steps steps-vertical lg:steps-horizontal">
+        <div class="step step-primary">Googleでサインアップ</div>
+        <div class="step step-primary">Blueskyアカウントを登録</div>
+        <div class="step step-primary">画像をアップロードして投稿</div>
+        <div class="step">透かし入り画像がBlueskyに投稿される</div>
+      </div>
+    </div>
+  </div>
+</Layout>

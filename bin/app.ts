@@ -10,6 +10,9 @@ import { ParamsResourceStack } from '../lib/params-resource-stack';
 import { SignupStack } from '../lib/signup-stack';
 import { VerifyStack } from '../lib/verify-stack';
 import { VerifyWatermarkStack } from '../lib/verify-watermark-stack';
+import { FrontendStack } from '../lib/frontend-stack';
+import { ApiStack } from '../lib/api-stack';
+import { FrontendDeploymentStack } from '../lib/frontend-deployment-stack';
 
 
 const app = new cdk.App();
@@ -90,7 +93,34 @@ const myPageStack = new MyPageStack(app, `${appName}-${stage}-mypage`, {
 });
 myPageStack.addDependency(authBackendStack);
 
-// 6. 投稿処理ワークフロー機能
+// 6.5. API機能
+const apiStack = new ApiStack(app, `${appName}-${stage}-api`, {
+  env,
+  stage,
+  appName,
+  paramsResourceStack
+});
+apiStack.addDependency(authBackendStack);
+
+// 7. フロントエンド機能
+const frontendStack = new FrontendStack(app, `${appName}-${stage}-frontend`, {
+  env,
+  stage,
+  appName,
+  domainName: process.env.DOMAIN_NAME || `${appName}-${stage}.example.com`
+});
+frontendStack.addDependency(apiStack);
+
+// 7.5. フロントエンドデプロイ
+const frontendDeploymentStack = new FrontendDeploymentStack(app, `${appName}-${stage}-frontend-deployment`, {
+  env,
+  stage,
+  appName,
+  frontendStack
+});
+frontendDeploymentStack.addDependency(frontendStack);
+
+// 8. 投稿処理ワークフロー機能
 const batchStack = new BatchStack(app, `${appName}-${stage}-batch`, {
   env,
   stage,

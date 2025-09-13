@@ -1,0 +1,149 @@
+---
+import Layout from '../components/Layout.astro';
+---
+
+<Layout title="My Page - Chronico">
+  <div class="container mx-auto px-4 py-8">
+    <div id="loading" class="text-center py-16">
+      <div class="loading loading-spinner loading-lg"></div>
+      <p class="mt-4">Loading...</p>
+    </div>
+    
+    <div id="content" class="hidden">
+      <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+        <div class="hero-content text-center py-12">
+          <div class="max-w-md">
+            <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
+            <p class="mb-5 text-lg">Manage your Bluesky account and create posts</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bluesky Account Section -->
+      <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+          <h2 class="card-title">Bluesky Account</h2>
+          <div id="bluesky-form">
+            <div class="form-control mb-4">
+              <label class="label">
+                <span class="label-text">Bluesky User ID</span>
+              </label>
+              <input type="text" id="bluesky-user-id" placeholder="your-handle.bsky.social" class="input input-bordered" />
+            </div>
+            <div class="form-control mb-4">
+              <label class="label">
+                <span class="label-text">App Password</span>
+              </label>
+              <input type="password" id="bluesky-password" placeholder="App Password" class="input input-bordered" />
+            </div>
+            <button id="register-bluesky" class="btn btn-primary">Register Bluesky Account</button>
+          </div>
+          
+          <div id="bluesky-registered" class="hidden">
+            <div class="alert alert-success">
+              <span>✅ Bluesky account registered successfully!</span>
+            </div>
+            <p>User ID: <span id="registered-user-id"></span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Post Creation Section -->
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <h2 class="card-title">Create Post</h2>
+          <form id="post-form" enctype="multipart/form-data">
+            <div class="form-control mb-4">
+              <label class="label">
+                <span class="label-text">Message</span>
+              </label>
+              <textarea id="post-message" class="textarea textarea-bordered" placeholder="What's happening?"></textarea>
+            </div>
+            <div class="form-control mb-4">
+              <label class="label">
+                <span class="label-text">Image</span>
+              </label>
+              <input type="file" id="post-image" accept="image/*" class="file-input file-input-bordered" />
+            </div>
+            <button type="submit" class="btn btn-primary">Post to Bluesky</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { fetchUserInfo, registerBluesky, createPost } from '../scripts/api.js';
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const userInfo = await fetchUserInfo();
+      renderMyPage(userInfo);
+    } catch (error) {
+      console.error('Failed to load user info:', error);
+      document.getElementById('loading').innerHTML = `
+        <div class="alert alert-error">
+          <span>Failed to load user information. Please try logging in again.</span>
+        </div>
+        <a href="/login" class="btn btn-primary mt-4">Go to Login</a>
+      `;
+    }
+  });
+
+  function renderMyPage(userInfo) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('content').classList.remove('hidden');
+
+    if (userInfo.blueskyUserId) {
+      document.getElementById('bluesky-form').classList.add('hidden');
+      document.getElementById('bluesky-registered').classList.remove('hidden');
+      document.getElementById('registered-user-id').textContent = userInfo.blueskyUserId;
+    }
+
+    // Bluesky registration
+    document.getElementById('register-bluesky').addEventListener('click', async () => {
+      const userId = document.getElementById('bluesky-user-id').value;
+      const password = document.getElementById('bluesky-password').value;
+
+      if (!userId || !password) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      try {
+        await registerBluesky({ userId, password });
+        location.reload();
+      } catch (error) {
+        alert('Failed to register Bluesky account');
+      }
+    });
+
+    // Post creation
+    document.getElementById('post-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const message = document.getElementById('post-message').value;
+      const imageFile = document.getElementById('post-image').files[0];
+
+      if (!message && !imageFile) {
+        alert('Please provide a message or image');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('message', message);
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+
+      try {
+        const result = await createPost(formData);
+        alert('Post created successfully!');
+        document.getElementById('post-form').reset();
+      } catch (error) {
+        alert('Failed to create post');
+      }
+    });
+  }
+</script>

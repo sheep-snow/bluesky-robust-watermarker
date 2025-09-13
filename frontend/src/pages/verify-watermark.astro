@@ -1,0 +1,104 @@
+---
+import Layout from '../components/Layout.astro';
+---
+
+<Layout title="Verify Watermark - Chronico">
+  <div class="container mx-auto px-4 py-8">
+    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+      <div class="hero-content text-center py-12">
+        <div class="max-w-md">
+          <h1 class="mb-5 text-4xl font-bold">🔍 Verify Watermark</h1>
+          <p class="mb-5 text-lg">Upload an image to check for embedded watermarks</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">Upload Image for Verification</h2>
+        <form id="verify-form" enctype="multipart/form-data">
+          <div class="form-control mb-4">
+            <label class="label">
+              <span class="label-text">Select Image</span>
+            </label>
+            <input type="file" id="verify-image" accept="image/*" class="file-input file-input-bordered" required />
+          </div>
+          <button type="submit" class="btn btn-primary">Verify Watermark</button>
+        </form>
+        
+        <div id="result" class="mt-8 hidden">
+          <div class="divider">Verification Result</div>
+          <div id="result-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { verifyWatermark } from '../scripts/api.js';
+
+  document.getElementById('verify-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const imageFile = document.getElementById('verify-image').files[0];
+    if (!imageFile) {
+      alert('Please select an image');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    try {
+      const result = await verifyWatermark(formData);
+      displayResult(result);
+    } catch (error) {
+      displayError('Failed to verify watermark');
+    }
+  });
+
+  function displayResult(result) {
+    const resultDiv = document.getElementById('result');
+    const contentDiv = document.getElementById('result-content');
+    
+    if (result.watermarkFound) {
+      contentDiv.innerHTML = `
+        <div class="alert alert-success">
+          <span>✅ Watermark detected!</span>
+        </div>
+        <div class="stats stats-vertical lg:stats-horizontal shadow mt-4">
+          <div class="stat">
+            <div class="stat-title">Original Poster</div>
+            <div class="stat-value text-primary">${result.originalPoster}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Post Date</div>
+            <div class="stat-value text-secondary">${new Date(result.postDate).toLocaleDateString()}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      contentDiv.innerHTML = `
+        <div class="alert alert-warning">
+          <span>⚠️ No watermark detected in this image</span>
+        </div>
+      `;
+    }
+    
+    resultDiv.classList.remove('hidden');
+  }
+
+  function displayError(message) {
+    const resultDiv = document.getElementById('result');
+    const contentDiv = document.getElementById('result-content');
+    
+    contentDiv.innerHTML = `
+      <div class="alert alert-error">
+        <span>❌ ${message}</span>
+      </div>
+    `;
+    
+    resultDiv.classList.remove('hidden');
+  }
+</script>
