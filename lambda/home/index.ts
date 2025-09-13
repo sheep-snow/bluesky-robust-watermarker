@@ -73,7 +73,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           <div class="hero-content text-center">
             <div class="max-w-md">
               <h1 class="mb-5 text-5xl font-bold"> ${APP_NAME}</h1>
-              <p class="mb-5 text-xl">Verify Your Image Provenance on Bluesky</p>
+              <p class="mb-5 text-xl">Bluesky に投稿する画像の来歴証明サービス</p>
               <div class="flex gap-4 justify-center items-center" id="hero-actions">
                 <a href="/signup" class="btn btn-accent btn-lg" id="hero-signup">Get Started</a>
                 <a href="/login" class="btn btn-outline btn-lg" id="hero-login">Login</a>
@@ -90,7 +90,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           <div class="card-body">
             <h2 class="card-title text-2xl mb-4">What is ${APP_NAME}?</h2>
             <p class="text-lg">
-              ${APP_NAME} is a service that helps you prove the authenticity and origin of your images posted on Bluesky. 
+              ${APP_NAME} Blueskyに投稿する画像の出所を証明するのに役立つサービスです
             </p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               <div class="step step-primary">Sign Up</div>
               <div class="step step-primary">Connect Bluesky</div>
               <div class="step step-primary">Post Images</div>
-              <div class="step step-primary">Auto Processing</div>
+              <div class="step step-primary">Generate Proof</div>
               <div class="step step-primary">Verification</div>
             </div>
           </div>
@@ -112,7 +112,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
         <aside>
           <p>© 2025 ${APP_NAME} - Image Provenance Service</p>
-          <p>Helping creators prove the authenticity of their work</p>
         </aside>
       </footer>
       

@@ -108,7 +108,6 @@ export const getFooter = () => `
     </nav>
     <aside>
       <p>© 2025 ${APP_NAME} - Image Provenance Service</p>
-      <p>Helping creators prove the authenticity of their work</p>
     </aside>
   </footer>
 `;
