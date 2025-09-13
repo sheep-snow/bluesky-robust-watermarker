@@ -1,5 +1,5 @@
 {
-  "name": "chronico",
+  "name": "brw",
   "version": "1.0.0",
   "scripts": {
     "build": "tsc",
@@ -29,7 +29,6 @@
     "@aws-sdk/client-s3": "^3.709.0",
     "@aws-sdk/client-ssm": "^3.709.0",
     "@aws-sdk/client-sqs": "^3.709.0",
-
     "dotenv": "^16.4.7",
     "nanoid": "^5.0.9"
   }
