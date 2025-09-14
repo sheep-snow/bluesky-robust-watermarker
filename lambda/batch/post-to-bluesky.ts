@@ -8,6 +8,8 @@ const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
 const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
 
+const APP_NAME = process.env.APP_NAME || 'brw';
+
 async function decryptPassword(encryptedPassword: string) {
   const decryptCommand = new DecryptCommand({
     CiphertextBlob: Buffer.from(encryptedPassword, 'base64')

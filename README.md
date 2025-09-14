@@ -75,7 +75,6 @@ Google OAuth 2.0 クライアントの設定手順は以下の通りです。
    - スコープを追加または削除 ボタンを押し、以下のスコープを追加する
      - 非機密のスコープ
        - /auth/userinfo.email
-       - /auth/userinfo.profile
        - openid
      - 機密性の高いスコープ
        - なし

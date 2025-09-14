@@ -4,11 +4,10 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import { ParamsResourceStack } from './params-resource-stack';
 
@@ -41,6 +40,7 @@ export class AuthBackendStack extends cdk.Stack {
       userPoolName: `${props.appName}-${props.stage}-user-pool`,
       selfSignUpEnabled: true,
       signInAliases: {
+        username: true,
         email: true
       },
       autoVerify: {
@@ -60,11 +60,9 @@ export class AuthBackendStack extends cdk.Stack {
       userPool: this.userPool,
       clientId: props.paramsResourceStack.googleClientId,
       clientSecretValue: cdk.SecretValue.unsafePlainText(props.paramsResourceStack.googleClientSecret),
-      scopes: ['email', 'openid', 'profile'],
+      scopes: ['email', 'openid'],
       attributeMapping: {
-        email: cognito.ProviderAttribute.GOOGLE_EMAIL,
-        givenName: cognito.ProviderAttribute.GOOGLE_GIVEN_NAME,
-        familyName: cognito.ProviderAttribute.GOOGLE_FAMILY_NAME
+        email: cognito.ProviderAttribute.GOOGLE_EMAIL
       }
     });
 
@@ -96,8 +94,7 @@ export class AuthBackendStack extends cdk.Stack {
         },
         scopes: [
           cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.PROFILE
+          cognito.OAuthScope.OPENID
         ],
         callbackUrls: [
           `https://${props.paramsResourceStack.domainName}/callback`
