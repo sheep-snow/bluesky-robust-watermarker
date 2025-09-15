@@ -286,7 +286,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           <div class="hero-content text-center py-12">
             <div class="max-w-md">
               <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
-              <p class="mb-5 text-lg">Blueskyの設定を管理し、作品を投稿する</p>
+              <p class="mb-5 text-lg">Blueskyのアプリパスワードを登録し、作品を投稿する</p>
             </div>
           </div>
         </div>

@@ -594,8 +594,8 @@ def generate_upload_form_html() -> str:
       <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
         <div class="hero-content text-center py-12">
           <div class="max-w-md">
-            <h1 class="mb-5 text-4xl font-bold">🔍 透かし検証</h1>
-            <p class="mb-5 text-lg">画像の真正性を検証します</p>
+            <h1 class="mb-5 text-4xl font-bold">🔍 透かしの確認</h1>
+            <p class="mb-5 text-lg">アップロードした画像の透かしから来歴情報を探します</p>
           </div>
         </div>
       </div>

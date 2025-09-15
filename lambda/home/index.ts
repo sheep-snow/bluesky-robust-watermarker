@@ -40,7 +40,16 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         <p class="text-lg">
           ${APP_NAME} Blueskyに投稿する画像の出所を証明するのに役立つサービスです
         </p>
-      </div>
+
+        <p class="mb-5">以下の機能を提供します:</p>
+        <ul class="list-disc list-inside text-left mb-5">
+          <li>Post - Bluesky に見えない電子透かしを埋め込んで画像を投稿する</li>
+          <li>Provenance - 投稿時に画像の来歴ページを作成して公開する</li>
+          <li>Verify - 画像の電子透かしを読み込んで来歴ページを表示する</li>
+        </ul>
+        <p class="mb-5">つかいかた:</p>
+        <a href="https://zenn.dev/snowsheep/books/e94f4392a2f467" class="btn btn-primary btn-md">User Manual</a>
+        </div>
     </div>
 
     <script>
