@@ -73,6 +73,16 @@ export const handler = async (event: any) => {
       createdAt: new Date().toISOString()
     };
 
+    // Add content labels if specified
+    if (postData.contentLabels && postData.contentLabels.length > 0) {
+      postContent.labels = {
+        $type: 'com.atproto.label.defs#selfLabels',
+        values: postData.contentLabels.map((label: string) => ({
+          val: label
+        }))
+      };
+    }
+
     // Add image if exists - use the actual S3 key structure
     try {
       // Get image extension from post data or default to jpg
