@@ -69,6 +69,24 @@ export const handler = async (event: any) => {
                   <td><a href="https://bsky.app/profile/${userInfo.blueskyUserId}/post/${blueskyPostUri.split('/').pop()}" target="_blank" class="link link-primary">View on Bluesky</a></td>
                 </tr>
                 ` : ''}
+                ${postData.contentLabels && postData.contentLabels.length > 0 ? `
+                <tr>
+                  <th class="bg-base-200">Content Labels</th>
+                  <td>
+                    <div class="flex flex-wrap gap-2">
+                      ${postData.contentLabels.map((label: string) => {
+                        const labelMap: { [key: string]: string } = {
+                          'suggestive': 'きわどい',
+                          'nudity': 'ヌード',
+                          'porn': '成人向け',
+                          'graphic-media': '生々しいメディア'
+                        };
+                        return `<span class="badge badge-warning">${labelMap[label] || label}</span>`;
+                      }).join('')}
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
               </tbody>
             </table>
           </div>
@@ -82,6 +100,22 @@ export const handler = async (event: any) => {
           <div class="card bg-base-200 p-4">
             <p class="text-base-content">${postData.text}</p>
           </div>
+          ${postData.contentLabels && postData.contentLabels.length > 0 ? `
+          <div class="mt-4">
+            <h4 class="font-semibold mb-2">Content Labels:</h4>
+            <div class="flex flex-wrap gap-2">
+              ${postData.contentLabels.map((label: string) => {
+                const labelMap: { [key: string]: string } = {
+                  'suggestive': 'きわどい',
+                  'nudity': 'ヌード', 
+                  'porn': '成人向け',
+                  'graphic-media': '生々しいメディア'
+                };
+                return `<span class="badge badge-warning">${labelMap[label] || label}</span>`;
+              }).join('')}
+            </div>
+          </div>
+          ` : ''}
         </div>
       </div>
       ` : ''}
@@ -89,17 +123,14 @@ export const handler = async (event: any) => {
       ${event.hasWatermarkedImage || event.hasProcessedImage ? `
       <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
-          <h3 class="card-title text-xl text-primary">🖼️ 透かし埋込済画像</h3>
-          <div class="text-center">
-            <img src="/provenance/${postId}/image.${postData.imageExtension || 'jpg'}" alt="Post image" class="max-w-full h-auto rounded-lg shadow-md" />
-          </div>
+          <h3 class="card-title text-xl text-primary">🔒 Watermark Protection</h3>
           ${event.hasWatermarkedImage ? `
-          <div class="alert alert-success mt-6">
+          <div class="alert alert-success">
             <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <div>
-              <h4 class="font-bold">🔒 Watermark Protection</h4>
+              <h4 class="font-bold">Watermark Embedded</h4>
               <div class="text-sm mt-2">
-                <p>This image contains a watermark embedding the Post ID: <span class="font-mono font-bold">${postId}</span></p>
+                <p>This post's image contains a watermark embedding the Post ID: <span class="font-mono font-bold">${postId}</span></p>
                 <p>The watermark is resistant to compression, resizing, and other image manipulations.</p>
                 ${event.watermarkData ? `
                 <div class="collapse collapse-arrow bg-base-200 mt-4">
@@ -155,6 +186,8 @@ export const handler = async (event: any) => {
 
     const provenanceHtml = wrapWithLayout(`${APP_NAME} - Provenance for Post ${postId}`, content, 'provenance');
 
+    console.log('Generated provenance page with content labels:', postData.contentLabels || []);
+
     // Save provenance page to public bucket
     const provenanceCommand = new PutObjectCommand({
       Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
@@ -164,38 +197,8 @@ export const handler = async (event: any) => {
     });
     await s3Client.send(provenanceCommand);
 
-    // Copy image to public provenance bucket if exists
-    try {
-      // Get image extension from post data or default to jpg
-      const imageExtension = postData.imageExtension || 'jpg';
-      const imageFormat = postData.imageFormat || 'jpeg';
-
-      // Use the actual S3 key structure: postId/image.extension
-      const imageKey = `${postId}/image.${imageExtension}`;
-
-      console.log('Attempting to get image from S3:', { bucket, imageKey });
-
-      const imageCommand = new GetObjectCommand({
-        Bucket: bucket,
-        Key: imageKey
-      });
-      const imageResult = await s3Client.send(imageCommand);
-      const imageBuffer = await imageResult.Body!.transformToByteArray();
-
-      console.log('Successfully retrieved image from S3, size:', imageBuffer.length);
-
-      const copyImageCommand = new PutObjectCommand({
-        Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
-        Key: `provenance/${postId}/image.${imageExtension}`,
-        Body: imageBuffer,
-        ContentType: imageFormat === 'jpeg' ? 'image/jpeg' : 'image/png'
-      });
-      await s3Client.send(copyImageCommand);
-      console.log('Image copied to provenance bucket successfully');
-    } catch (imageError) {
-      console.log('Failed to copy image to provenance bucket:', imageError);
-      // Continue without image - the provenance page will still be generated
-    }
+    // Note: Images are no longer copied to provenance bucket to avoid storing unnecessary data
+    console.log('Skipping image copy to provenance bucket - images are not displayed on provenance pages');
 
     const provenanceUrl = `https://${process.env.PROVENANCE_PUBLIC_BUCKET}.s3.amazonaws.com/provenance/${postId}/index.html`;
 

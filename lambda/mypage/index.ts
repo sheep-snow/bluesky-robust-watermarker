@@ -340,6 +340,37 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                     </label>
                     <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
                   </div>
+                  <details class="collapse bg-base-100 border-base-300 border">
+                    <summary class="collapse-title font-semibold">ラベル</summary>
+                    <div class="collapse-content">
+                      <div class="space-y-4">
+                        <div>
+                          <h4 class="font-medium text-sm mb-2">成人向けコンテンツ</h4>
+                          <div class="space-y-2">
+                            <label class="cursor-pointer label justify-start gap-3">
+                              <input type="checkbox" id="labelSuggestive" value="suggestive" class="checkbox checkbox-sm adult-content-checkbox" />
+                              <span class="label-text">きわどい</span>
+                            </label>
+                            <label class="cursor-pointer label justify-start gap-3">
+                              <input type="checkbox" id="labelNudity" value="nudity" class="checkbox checkbox-sm adult-content-checkbox" />
+                              <span class="label-text">ヌード</span>
+                            </label>
+                            <label class="cursor-pointer label justify-start gap-3">
+                              <input type="checkbox" id="labelPorn" value="porn" class="checkbox checkbox-sm adult-content-checkbox" />
+                              <span class="label-text">成人向け</span>
+                            </label>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 class="font-medium text-sm mb-2">その他</h4>
+                          <label class="cursor-pointer label justify-start gap-3">
+                            <input type="checkbox" id="labelGraphicMedia" class="checkbox checkbox-sm" />
+                            <span class="label-text">生々しいメディア</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
                   <button type="submit" class="btn btn-accent w-full">投稿</button>
                 </form>
               </div>
@@ -418,6 +449,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             // Load existing user info
             loadUserInfo();
             
+            // Handle adult content checkbox exclusivity
+            document.querySelectorAll('.adult-content-checkbox').forEach(checkbox => {
+              checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                  document.querySelectorAll('.adult-content-checkbox').forEach(other => {
+                    if (other !== this) other.checked = false;
+                  });
+                }
+              });
+            });
+            
             // Settings form submission
             document.getElementById('settingsForm').addEventListener('submit', async (e) => {
               e.preventDefault();
@@ -455,6 +497,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               const text = document.getElementById('postText').value;
               const imageFile = document.getElementById('postImage').files[0];
               
+              // Get content labels
+              const contentLabels = [];
+              const adultContentCheckboxes = document.querySelectorAll('.adult-content-checkbox:checked');
+              if (adultContentCheckboxes.length > 0) contentLabels.push(adultContentCheckboxes[0].value);
+              if (document.getElementById('labelGraphicMedia').checked) contentLabels.push('graphic-media');
+              
               // Check file size limit (3MB)
               if (imageFile && imageFile.size > 3 * 1024 * 1024) {
                 alert('画像ファイルサイズは3MB以下にしてください。');
@@ -473,7 +521,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               
               const postData = {
                 text: text,
-                image: imageBase64
+                image: imageBase64,
+                contentLabels: contentLabels
               };
               
               const response = await fetch('/mypage/post', {
@@ -665,6 +714,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             userId,
             text: body.text || '',
             image: body.image || null,
+            contentLabels: body.contentLabels || [],
             createdAt: new Date().toISOString()
           };
 
