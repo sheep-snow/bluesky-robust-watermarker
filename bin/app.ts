@@ -10,11 +10,15 @@ import { ParamsResourceStack } from '../lib/params-resource-stack';
 import { SignupStack } from '../lib/signup-stack';
 import { VerifyStack } from '../lib/verify-stack';
 import { VerifyWatermarkStack } from '../lib/verify-watermark-stack';
+import { ApiStack } from '../lib/api-stack';
+import { FrontendStack } from '../lib/frontend-stack';
 
 
 const app = new cdk.App();
 const stage = app.node.tryGetContext('stage') || 'dev';
 const appName = process.env.APP_NAME || 'brw';
+const domainName = process.env.DOMAIN_NAME!;
+const hostedZoneId = process.env.HOSTED_ZONE_ID!;
 const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: 'us-east-1'
@@ -100,9 +104,32 @@ const batchStack = new BatchStack(app, `${appName}-${stage}-batch`, {
 });
 batchStack.addDependency(myPageStack);
 
+// 7. 新しいAPI スタック
+const apiStack = new ApiStack(app, `${appName}-${stage}-api`, {
+  env,
+  stage,
+  appName,
+  paramsResourceStack
+});
+apiStack.addDependency(authBackendStack);
+
+// 8. 新しいフロントエンドスタック
+const frontendStack = new FrontendStack(app, `${appName}-${stage}-frontend`, {
+  env,
+  stage,
+  appName,
+  paramsResourceStack,
+  apiGatewayUrl: apiStack.api.url,
+  domainName,
+  hostedZoneId
+});
+frontendStack.addDependency(apiStack);
+
 // スタック間の依存関係:
 // 1. paramsResourceStack (基盤)
 // 2. authBackendStack (認証)
-// 3. signupStack, loginStack, verifyStack (公開Webアプリ)
-// 4. myPageStack (認証が必要なWebアプリ)
+// 3. signupStack, loginStack, verifyStack (旧公開Webアプリ)
+// 4. myPageStack (旧認証が必要なWebアプリ)
 // 5. batchStack (投稿処理ワークフロー)
+// 6. apiStack (新API)
+// 7. frontendStack (新フロントエンド)

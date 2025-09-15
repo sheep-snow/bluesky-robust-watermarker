@@ -1,0 +1,197 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="My Page - chronico" currentPage="mypage">
+  <div id="auth-required" class="hidden">
+    <div class="alert alert-warning">
+      <div>
+        <h3 class="font-bold">ログインが必要です</h3>
+        <p>この機能を使用するにはログインしてください</p>
+        <a href="/login" class="btn btn-primary btn-sm mt-2">ログイン</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="mypage-content" class="hidden">
+    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+      <div class="hero-content text-center">
+        <div class="max-w-md">
+          <h1 class="mb-5 text-4xl font-bold">マイページ</h1>
+          <p class="mb-5">Bluesky設定と画像投稿</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Bluesky設定 -->
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <h2 class="card-title">Bluesky設定</h2>
+          
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Bluesky Handle</span>
+            </label>
+            <input type="text" id="blueskyHandle" placeholder="your-handle.bsky.social" class="input input-bordered" />
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">App Password</span>
+            </label>
+            <input type="password" id="appPassword" placeholder="xxxx-xxxx-xxxx-xxxx" class="input input-bordered" />
+          </div>
+
+          <div class="card-actions justify-end">
+            <button id="saveConfig" class="btn btn-primary">設定を保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 画像投稿 -->
+      <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+          <h2 class="card-title">画像投稿</h2>
+          
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">投稿する画像</span>
+            </label>
+            <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">投稿メッセージ</span>
+            </label>
+            <textarea id="postMessage" class="textarea textarea-bordered" placeholder="投稿メッセージを入力..."></textarea>
+          </div>
+
+          <div id="imagePreview" class="hidden mt-4">
+            <img id="previewImg" class="max-w-full h-auto rounded-lg" />
+          </div>
+
+          <div class="card-actions justify-end">
+            <button id="postToBluesky" class="btn btn-success" disabled>
+              <span class="loading loading-spinner loading-sm hidden" id="postSpinner"></span>
+              Blueskyに投稿
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="postResult" class="hidden mt-6">
+      <div class="alert">
+        <div id="postResultContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check authentication
+    function checkAuth() {
+      const accessToken = localStorage.getItem('access_token');
+      const idToken = localStorage.getItem('id_token');
+      
+      if (!accessToken || !idToken) {
+        document.getElementById('auth-required').classList.remove('hidden');
+        return false;
+      }
+      
+      document.getElementById('mypage-content').classList.remove('hidden');
+      return true;
+    }
+
+    // Image preview
+    document.getElementById('postImage').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('previewImg').src = e.target.result;
+          document.getElementById('imagePreview').classList.remove('hidden');
+          document.getElementById('postToBluesky').disabled = false;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Save Bluesky config
+    document.getElementById('saveConfig').addEventListener('click', async () => {
+      const handle = document.getElementById('blueskyHandle').value;
+      const password = document.getElementById('appPassword').value;
+      
+      if (!handle || !password) {
+        alert('Handle and App Password are required');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/mypage/config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          },
+          body: JSON.stringify({ handle, password })
+        });
+
+        if (response.ok) {
+          alert('設定を保存しました');
+        } else {
+          alert('設定の保存に失敗しました');
+        }
+      } catch (error) {
+        alert('エラーが発生しました');
+      }
+    });
+
+    // Post to Bluesky
+    document.getElementById('postToBluesky').addEventListener('click', async () => {
+      const file = document.getElementById('postImage').files[0];
+      const message = document.getElementById('postMessage').value;
+      
+      if (!file) return;
+
+      const postBtn = document.getElementById('postToBluesky');
+      const spinner = document.getElementById('postSpinner');
+      
+      postBtn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('message', message);
+
+      try {
+        const response = await fetch('/api/mypage/post', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          },
+          body: formData
+        });
+
+        const result = await response.json();
+        
+        document.getElementById('postResultContent').innerHTML = 
+          response.ok ? 
+          `<p class="text-success">投稿が完了しました！<br><a href="${result.provenance_url}" class="link">来歴ページ</a></p>` :
+          `<p class="text-error">投稿に失敗しました: ${result.error}</p>`;
+        
+        document.getElementById('postResult').classList.remove('hidden');
+      } catch (error) {
+        document.getElementById('postResultContent').innerHTML = '<p class="text-error">エラーが発生しました</p>';
+        document.getElementById('postResult').classList.remove('hidden');
+      }
+
+      postBtn.disabled = false;
+      spinner.classList.add('hidden');
+    });
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', checkAuth);
+  </script>
+</Layout>

@@ -1,0 +1,110 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Verify Watermark - chronico" currentPage="verify-watermark">
+  <div class="container mx-auto max-w-4xl">
+    <div class="hero bg-gradient-to-r from-info to-success text-info-content rounded-lg mb-8">
+      <div class="hero-content text-center">
+        <div class="max-w-md">
+          <h1 class="mb-5 text-4xl font-bold">透かし検証</h1>
+          <p class="mb-5">画像の電子透かしを読み取って来歴を確認</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">画像をアップロード</h2>
+        
+        <div class="form-control w-full">
+          <label class="label">
+            <span class="label-text">検証したい画像を選択してください</span>
+          </label>
+          <input type="file" id="imageInput" accept="image/*" class="file-input file-input-bordered w-full" />
+        </div>
+
+        <div id="imagePreview" class="hidden mt-4">
+          <img id="previewImg" class="max-w-full h-auto rounded-lg" />
+        </div>
+
+        <div class="card-actions justify-end mt-4">
+          <button id="verifyBtn" class="btn btn-primary" disabled>
+            <span class="loading loading-spinner loading-sm hidden" id="loadingSpinner"></span>
+            透かしを検証
+          </button>
+        </div>
+
+        <div id="results" class="hidden mt-6">
+          <div class="alert alert-info">
+            <div>
+              <h3 class="font-bold">検証結果</h3>
+              <div id="resultContent"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+    const verifyBtn = document.getElementById('verifyBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const results = document.getElementById('results');
+    const resultContent = document.getElementById('resultContent');
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          previewImg.src = e.target.result;
+          imagePreview.classList.remove('hidden');
+          verifyBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    verifyBtn.addEventListener('click', async () => {
+      const file = imageInput.files[0];
+      if (!file) return;
+
+      verifyBtn.disabled = true;
+      loadingSpinner.classList.remove('hidden');
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      try {
+        const response = await fetch('/api/verify/watermark', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+        
+        if (result.watermark_found) {
+          resultContent.innerHTML = `
+            <p><strong>透かしが見つかりました！</strong></p>
+            <p>投稿者: ${result.provenance_url}</p>
+            <a href="${result.provenance_url}" class="btn btn-sm btn-outline mt-2">来歴ページを見る</a>
+          `;
+        } else {
+          resultContent.innerHTML = '<p>透かしが見つかりませんでした</p>';
+        }
+        
+        results.classList.remove('hidden');
+      } catch (error) {
+        resultContent.innerHTML = '<p class="text-error">検証中にエラーが発生しました</p>';
+        results.classList.remove('hidden');
+      }
+
+      verifyBtn.disabled = false;
+      loadingSpinner.classList.add('hidden');
+    });
+  </script>
+</Layout>

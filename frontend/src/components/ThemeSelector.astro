@@ -1,0 +1,37 @@
+---
+const themes = [
+  'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate', 
+  'synthwave', 'retro', 'cyberpunk', 'valentine', 'halloween', 'garden',
+  'forest', 'aqua', 'lofi', 'pastel', 'fantasy', 'wireframe', 'black',
+  'luxury', 'dracula', 'cmyk', 'autumn', 'business', 'acid', 'lemonade',
+  'night', 'coffee', 'winter', 'dim', 'nord', 'sunset'
+];
+---
+
+<div class="dropdown dropdown-end">
+  <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+    </svg>
+  </div>
+  <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto">
+    <li class="menu-title">Choose Theme</li>
+    {themes.map(theme => (
+      <li><a onclick={`changeTheme('${theme}')`}>🎨 {theme}</a></li>
+    ))}
+  </ul>
+</div>
+
+<script>
+  function changeTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('chronico-theme', theme);
+  }
+  
+  function initTheme() {
+    const savedTheme = localStorage.getItem('chronico-theme') || 'cupcake';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }
+  
+  document.addEventListener('DOMContentLoaded', initTheme);
+</script>

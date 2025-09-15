@@ -1,0 +1,108 @@
+---
+import ThemeSelector from '../components/ThemeSelector.astro';
+import '../styles/global.css';
+
+export interface Props {
+  title: string;
+  currentPage?: string;
+}
+
+const { title, currentPage = '' } = Astro.props;
+const APP_NAME = 'chronico';
+---
+
+<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+</head>
+<body class="min-h-screen flex flex-col">
+  <div class="navbar bg-base-100 shadow-lg">
+    <div class="navbar-start">
+      <div class="dropdown">
+        <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
+          </svg>
+        </div>
+        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+          <li><a href="/" class={currentPage === 'home' ? 'active' : ''}>Home</a></li>
+          <li><a href="/signup" class={currentPage === 'signup' ? 'active' : ''}>Sign Up</a></li>
+          <li><a href="/login" class={currentPage === 'login' ? 'active' : ''}>Login</a></li>
+          <li><a href="/mypage" class={currentPage === 'mypage' ? 'active' : ''}>My Page</a></li>
+          <li><a href="/verify-watermark" class={currentPage === 'verify-watermark' ? 'active' : ''}>Verify</a></li>
+        </ul>
+      </div>
+      <a href="/" class="btn btn-ghost text-xl">{APP_NAME}</a>
+    </div>
+    <div class="navbar-center hidden lg:flex">
+      <ul class="menu menu-horizontal px-1">
+        <li><a href="/" class={currentPage === 'home' ? 'active' : ''}>Home</a></li>
+        <li><a href="/signup" class={currentPage === 'signup' ? 'active' : ''}>Sign Up</a></li>
+        <li><a href="/login" class={currentPage === 'login' ? 'active' : ''}>Login</a></li>
+        <li><a href="/mypage" class={currentPage === 'mypage' ? 'active' : ''}>My Page</a></li>
+        <li><a href="/verify-watermark" class={currentPage === 'verify-watermark' ? 'active' : ''}>Verify</a></li>
+      </ul>
+    </div>
+    <div class="navbar-end">
+      <div class="hidden" id="auth-actions">
+        <button onclick="logout()" class="btn btn-error btn-sm mr-2">Logout</button>
+      </div>
+      <ThemeSelector />
+    </div>
+  </div>
+
+  <main class="flex-1 container mx-auto px-4 py-8">
+    <slot />
+  </main>
+
+  <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+    <aside>
+      <p>© 2025 {APP_NAME} - Image Provenance Service</p>
+    </aside>
+  </footer>
+
+  <script>
+    function logout() {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/';
+    }
+
+    function checkAuthAndUpdateNav() {
+      const accessToken = localStorage.getItem('access_token');
+      const idToken = localStorage.getItem('id_token');
+      const isAuthenticated = accessToken && idToken;
+      
+      const signupLinks = document.querySelectorAll('a[href="/signup"]');
+      const loginLinks = document.querySelectorAll('a[href="/login"]');
+      const authActions = document.getElementById('auth-actions');
+      
+      signupLinks.forEach(link => {
+        if (link.closest('li')) {
+          link.closest('li').style.display = isAuthenticated ? 'none' : '';
+        } else {
+          link.style.display = isAuthenticated ? 'none' : '';
+        }
+      });
+      
+      loginLinks.forEach(link => {
+        if (link.closest('li')) {
+          link.closest('li').style.display = isAuthenticated ? 'none' : '';
+        } else {
+          link.style.display = isAuthenticated ? 'none' : '';
+        }
+      });
+      
+      if (authActions) {
+        authActions.classList.toggle('hidden', !isAuthenticated);
+      }
+    }
+    
+    document.addEventListener('DOMContentLoaded', checkAuthAndUpdateNav);
+  </script>
+</body>
+</html>
