@@ -170,3 +170,7 @@ npx cdk deploy --all --context stage=prd --require-approval never
 
 https://${YOUR_DOMAIN}/
 
+## ライセンス
+
+このプロジェクトは MIT ライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+
