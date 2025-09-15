@@ -174,3 +174,10 @@ https://${YOUR_DOMAIN}/
 
 このプロジェクトは MIT ライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
 
+
+## 寄付
+
+コーヒーと運営費をご支援頂けると励みになります ☕️
+
+- [Buy Me a Coffee](https://buymeacoffee.com/snowsheep)
+- [ko-fi](https://ko-fi.com/sheepsnow)
