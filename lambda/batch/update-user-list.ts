@@ -7,9 +7,11 @@ const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
 const cloudFrontClient = new CloudFrontClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 export const handler = async (event: any) => {
-  console.log('Update user list event:', JSON.stringify(event, null, 2));
+  console.log('Update user list handler started, event:', JSON.stringify(event));
 
-  const { postId, userId, provenanceUrl } = event;
+  // Handle Map task output (array) or direct input (object)
+  const eventData = Array.isArray(event) ? event[0] : event;
+  const { postId, userId, provenanceUrl } = eventData;
 
   try {
     // Get user info
@@ -201,7 +203,7 @@ export const handler = async (event: any) => {
     const userListUrl = `/users/${userInfo.provenancePageId}.html`;
 
     return {
-      ...event,
+      ...eventData,
       userListUrl,
       userListUpdated: true,
       totalPosts: userPosts.length

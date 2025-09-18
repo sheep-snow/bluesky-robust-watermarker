@@ -114,24 +114,17 @@ def compress_image_to_size_limit(image_data: bytes, max_size: int = MAX_FILE_SIZ
         raise
 
 
-def find_image_file(bucket_name: str, post_id: str) -> Optional[str]:
-    """Find the image file for a given post ID, supporting both jpg and png formats."""
-    possible_keys = [
-        f"{post_id}/image.jpg",
-        f"{post_id}/image.jpeg",
-        f"{post_id}/image.png",
-    ]
-
-    for key in possible_keys:
-        try:
-            s3_client.head_object(Bucket=bucket_name, Key=key)
-            logger.info(f"Found image file: {key}")
-            return key
-        except Exception:
-            continue
-
-    logger.error(f"No image file found for post {post_id}")
-    return None
+def find_image_file(bucket_name: str, post_id: str, image_index: int = 1, image_extension: str = "png") -> Optional[str]:
+    """Find the image file for a given post ID and index."""
+    key = f"{post_id}/image{image_index}.{image_extension}"
+    
+    try:
+        s3_client.head_object(Bucket=bucket_name, Key=key)
+        logger.info(f"Found image file: {key}")
+        return key
+    except Exception as e:
+        logger.error(f"No image file found: {key}, error: {e}")
+        return None
 
 
 def get_content_type(key: str) -> str:
@@ -234,6 +227,8 @@ def handler(
             logger.info("Step Functions invocation detected")
             bucket_name = event.get("bucket") or event.get("bucketName")
             post_id = event["postId"]
+            image_index = event.get("imageIndex", 1)
+            image_extension = event.get("imageExtension", "png")
 
             if not bucket_name:
                 return {
@@ -242,13 +237,13 @@ def handler(
                     "headers": {"Content-Type": "application/json"},
                 }
 
-            # Find the actual image file (jpg or png)
-            image_key = find_image_file(bucket_name, post_id)
+            # Find the actual image file using index and extension
+            image_key = find_image_file(bucket_name, post_id, image_index, image_extension)
             if not image_key:
                 return {
                     "statusCode": 404,
                     "body": json.dumps(
-                        {"error": f"No image file found for post {post_id}"}
+                        {"error": f"No image file found for post {post_id}, index {image_index}"}
                     ),
                     "headers": {"Content-Type": "application/json"},
                 }

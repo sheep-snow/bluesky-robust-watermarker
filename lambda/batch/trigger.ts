@@ -22,7 +22,9 @@ export const handler = async (event: SQSEvent) => {
           Key: `${message.postId}/post.json`
         });
         const postResult = await s3Client.send(postCommand);
-        const postData = JSON.parse(await postResult.Body!.transformToString());
+        const postDataString = await postResult.Body!.transformToString();
+        const postData = JSON.parse(postDataString);
+        console.log('Post data loaded, imageMetadata count:', postData.imageMetadata?.length || 0);
         
         if (postData.imageMetadata && postData.imageMetadata.length > 0) {
           imageMetadata = postData.imageMetadata;

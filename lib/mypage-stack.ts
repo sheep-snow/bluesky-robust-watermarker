@@ -307,6 +307,11 @@ export class MyPageStack extends cdk.Stack {
       exportName: `${props.appName}-${props.stage}-post-data-bucket-name`
     });
 
+    new cdk.CfnOutput(this, 'PostDataBucketArn', {
+      value: this.postDataBucket.bucketArn,
+      exportName: `${props.appName}-${props.stage}-post-data-bucket-arn`
+    });
+
     new cdk.CfnOutput(this, 'ProvenanceBucketName', {
       value: this.provenanceBucket.bucketName,
       exportName: `${props.appName}-${props.stage}-provenance-bucket-name`

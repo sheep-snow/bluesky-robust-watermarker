@@ -848,16 +848,20 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             }
           }
 
-          // Save post data to S3
-          const postDataWithImages = {
-            ...postData,
+          // Save post data to S3 (without image data)
+          const postDataForStorage = {
+            postId,
+            userId,
+            text: body.text || '',
+            contentLabels: body.contentLabels || [],
+            createdAt: new Date().toISOString(),
             imageMetadata: imageMetadata
           };
 
           const putCommand = new PutObjectCommand({
             Bucket: process.env.POST_DATA_BUCKET,
             Key: `${postId}/post.json`,
-            Body: JSON.stringify(postDataWithImages),
+            Body: JSON.stringify(postDataForStorage),
             ContentType: 'application/json'
           });
           await s3Client.send(putCommand);

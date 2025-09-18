@@ -5,9 +5,11 @@ const APP_NAME = process.env.APP_NAME || 'brw';
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 
 export const handler = async (event: any) => {
-  console.log('Generate provenance event:', JSON.stringify(event, null, 2));
+  console.log('Generate provenance handler started, event:', JSON.stringify(event));
 
-  const { postId, userId, bucket, blueskyPostUri, postedAt } = event;
+  // Handle Map task output (array) or direct input (object)
+  const eventData = Array.isArray(event) ? event[0] : event;
+  const { postId, userId, bucket, blueskyPostUri, postedAt } = eventData;
 
   try {
     // Get post data
@@ -239,7 +241,7 @@ export const handler = async (event: any) => {
     const provenanceUrl = `https://${process.env.PROVENANCE_PUBLIC_BUCKET}.s3.amazonaws.com/provenance/${postId}/index.html`;
 
     return {
-      ...event,
+      ...eventData,
       provenanceUrl,
       provenanceGenerated: true
     };

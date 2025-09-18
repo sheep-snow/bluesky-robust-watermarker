@@ -79,7 +79,164 @@ def get_verification_result(verification_id: str) -> Optional[Dict]:
 
 def generate_result_page_html(verification_id: str, result: Dict) -> str:
     """Generate HTML page for showing verification result using DaisyUI layout."""
-    from lambda.common.ui_framework import wrapWithLayout
+    def wrapWithLayout(title: str, content: str, active_page: str = "") -> str:
+        """Wrap content with DaisyUI layout matching mypage design."""
+        app_name_lower = APP_NAME.lower()
+        return f"""<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+    <title>{title}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://{DOMAIN_NAME}/tailwind.min.css" rel="stylesheet" type="text/css" />
+    <script>
+        const THEMES = [
+            'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate', 
+            'synthwave', 'retro', 'cyberpunk', 'valentine', 'halloween', 'garden',
+            'forest', 'aqua', 'lofi', 'pastel', 'fantasy', 'wireframe', 'black',
+            'luxury', 'dracula', 'cmyk', 'autumn', 'business', 'acid', 'lemonade',
+            'night', 'coffee', 'winter', 'dim', 'nord', 'sunset'
+        ];
+        
+        function initTheme() {{
+            const savedTheme = localStorage.getItem('{app_name_lower}-theme') || 'cupcake';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }}
+        
+        function changeTheme(theme) {{
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('{app_name_lower}-theme', theme);
+        }}
+        
+        function logout() {{
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('refresh_token');
+            window.location.href = '/';
+        }}
+        
+        document.addEventListener('DOMContentLoaded', initTheme);
+    </script>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div class="navbar bg-base-100 shadow-lg">
+        <div class="navbar-start">
+            <div class="dropdown">
+                <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
+                    </svg>
+                </div>
+                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                    <li><a href="/" class="{"active" if active_page == "home" else ""}">Home</a></li>
+                    <li><a href="/signup" class="{"active" if active_page == "signup" else ""}">Sign Up</a></li>
+                    <li><a href="/login" class="{"active" if active_page == "login" else ""}">Login</a></li>
+                    <li><a href="/mypage" class="{"active" if active_page == "mypage" else ""}">My Page</a></li>
+                    <li><a href="/verify-watermark" class="{"active" if active_page == "verify-watermark" else ""}">Verify</a></li>
+                </ul>
+            </div>
+            <a href="/" class="btn btn-ghost text-xl">{APP_NAME}</a>
+        </div>
+        <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1">
+                <li><a href="/" class="{"active" if active_page == "home" else ""}">Home</a></li>
+                <li><a href="/signup" class="{"active" if active_page == "signup" else ""}">Sign Up</a></li>
+                <li><a href="/login" class="{"active" if active_page == "login" else ""}">Login</a></li>
+                <li><a href="/mypage" class="{"active" if active_page == "mypage" else ""}">My Page</a></li>
+                <li><a href="/verify-watermark" class="{"active" if active_page == "verify-watermark" else ""}">Verify</a></li>
+            </ul>
+        </div>
+        <div class="navbar-end">
+            <div class="hidden" id="auth-actions">
+                <button onclick="logout()" class="btn btn-error btn-sm mr-2">Logout</button>
+            </div>
+            <div class="dropdown dropdown-end">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto">
+                    <li class="menu-title">Choose Theme</li>
+                    <li><a onclick="changeTheme('light')">🌞 Light</a></li>
+                    <li><a onclick="changeTheme('dark')">🌙 Dark</a></li>
+                    <li><a onclick="changeTheme('cupcake')">🧁 Cupcake</a></li>
+                    <li><a onclick="changeTheme('bumblebee')">🐝 Bumblebee</a></li>
+                    <li><a onclick="changeTheme('emerald')">💎 Emerald</a></li>
+                    <li><a onclick="changeTheme('corporate')">🏢 Corporate</a></li>
+                    <li><a onclick="changeTheme('synthwave')">🌆 Synthwave</a></li>
+                    <li><a onclick="changeTheme('retro')">📻 Retro</a></li>
+                    <li><a onclick="changeTheme('cyberpunk')">🤖 Cyberpunk</a></li>
+                    <li><a onclick="changeTheme('valentine')">💝 Valentine</a></li>
+                    <li><a onclick="changeTheme('halloween')">🎃 Halloween</a></li>
+                    <li><a onclick="changeTheme('garden')">🌸 Garden</a></li>
+                    <li><a onclick="changeTheme('forest')">🌲 Forest</a></li>
+                    <li><a onclick="changeTheme('aqua')">🌊 Aqua</a></li>
+                    <li><a onclick="changeTheme('lofi')">🎵 Lofi</a></li>
+                    <li><a onclick="changeTheme('pastel')">🎨 Pastel</a></li>
+                    <li><a onclick="changeTheme('fantasy')">🦄 Fantasy</a></li>
+                    <li><a onclick="changeTheme('wireframe')">📐 Wireframe</a></li>
+                    <li><a onclick="changeTheme('black')">⚫ Black</a></li>
+                    <li><a onclick="changeTheme('luxury')">💰 Luxury</a></li>
+                    <li><a onclick="changeTheme('dracula')">🧛 Dracula</a></li>
+                    <li><a onclick="changeTheme('cmyk')">🎨 CMYK</a></li>
+                    <li><a onclick="changeTheme('autumn')">🍂 Autumn</a></li>
+                    <li><a onclick="changeTheme('business')">💼 Business</a></li>
+                    <li><a onclick="changeTheme('acid')">🧪 Acid</a></li>
+                    <li><a onclick="changeTheme('lemonade')">🍋 Lemonade</a></li>
+                    <li><a onclick="changeTheme('night')">🌃 Night</a></li>
+                    <li><a onclick="changeTheme('coffee')">☕ Coffee</a></li>
+                    <li><a onclick="changeTheme('winter')">❄️ Winter</a></li>
+                    <li><a onclick="changeTheme('dim')">🔅 Dim</a></li>
+                    <li><a onclick="changeTheme('nord')">🏔️ Nord</a></li>
+                    <li><a onclick="changeTheme('sunset')">🌅 Sunset</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <main class="flex-1 container mx-auto px-4 py-8">
+        {content}
+    </main>
+    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+        <aside>
+            <p>© 2025 {APP_NAME} - Image Provenance Service</p>
+        </aside>
+    </footer>
+    <script>
+        function checkAuthAndUpdateNav() {{
+            const accessToken = localStorage.getItem('access_token');
+            const idToken = localStorage.getItem('id_token');
+            const isAuthenticated = accessToken && idToken;
+            
+            const signupLinks = document.querySelectorAll('a[href="/signup"]');
+            const loginLinks = document.querySelectorAll('a[href="/login"]');
+            const authActions = document.getElementById('auth-actions');
+            
+            signupLinks.forEach(link => {{
+                if (link.closest('li')) {{
+                    link.closest('li').style.display = isAuthenticated ? 'none' : '';
+                }} else {{
+                    link.style.display = isAuthenticated ? 'none' : '';
+                }}
+            }});
+            
+            loginLinks.forEach(link => {{
+                if (link.closest('li')) {{
+                    link.closest('li').style.display = isAuthenticated ? 'none' : '';
+                }} else {{
+                    link.style.display = isAuthenticated ? 'none' : '';
+                }}
+            }});
+            
+            if (authActions) {{
+                authActions.classList.toggle('hidden', !isAuthenticated);
+            }}
+        }}
+        
+        document.addEventListener('DOMContentLoaded', checkAuthAndUpdateNav);
+    </script>
+</body>
+</html>"""
 
     if result["status"] == "processing":
         content = f"""
@@ -148,7 +305,9 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
                   </div>
                 </div>
                 """
-                return wrapWithLayout(f"透かし検証完了 - {APP_NAME}", content, "verify-watermark")
+                return wrapWithLayout(
+                    f"透かし検証完了 - {APP_NAME}", content, "verify-watermark"
+                )
             else:
                 content = f"""
                 <div class="hero bg-gradient-to-r from-warning to-accent text-warning-content rounded-lg mb-8">
@@ -179,7 +338,9 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
                   </div>
                 </div>
                 """
-                return wrapWithLayout(f"透かし検証完了 - {APP_NAME}", content, "verify-watermark")
+                return wrapWithLayout(
+                    f"透かし検証完了 - {APP_NAME}", content, "verify-watermark"
+                )
         else:
             content = f"""
             <div class="hero bg-gradient-to-r from-error to-warning text-error-content rounded-lg mb-8">
@@ -204,7 +365,9 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
               </div>
             </div>
             """
-            return wrapWithLayout(f"透かし検証完了 - {APP_NAME}", content, "verify-watermark")
+            return wrapWithLayout(
+                f"透かし検証完了 - {APP_NAME}", content, "verify-watermark"
+            )
 
     elif result["status"] == "error":
         error_message = result.get("error_message", "不明なエラー")
@@ -272,7 +435,9 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
           </div>
         </div>
         """
-        return wrapWithLayout(f"不明なステータス - {APP_NAME}", content, "verify-watermark")
+        return wrapWithLayout(
+            f"不明なステータス - {APP_NAME}", content, "verify-watermark"
+        )
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

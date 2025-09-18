@@ -20,9 +20,11 @@ async function decryptPassword(encryptedPassword: string) {
 }
 
 export const handler = async (event: any) => {
-  console.log('Post to Bluesky event:', JSON.stringify(event, null, 2));
+  console.log('Post to Bluesky handler started, event:', event);
 
-  const { postId, bucket } = event;
+  // Handle array input from Map task
+  const inputData = Array.isArray(event) ? event[0] : event;
+  const { postId, bucket = process.env.POST_DATA_BUCKET } = inputData;
 
   try {
     // Get post data first to extract correct userId
@@ -145,7 +147,7 @@ export const handler = async (event: any) => {
     console.log('Posted to Bluesky:', blueskyResult.data);
 
     return {
-      ...event,
+      ...inputData,
       userId: userId, // Use the correct userId from post.json
       blueskyPostUri: blueskyResult.data.uri,
       blueskyPostCid: blueskyResult.data.cid,
