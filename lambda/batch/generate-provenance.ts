@@ -17,6 +17,10 @@ export const handler = async (event: any) => {
     });
     const postResult = await s3Client.send(postCommand);
     const postData = JSON.parse(await postResult.Body!.transformToString());
+    
+    // Handle both old single image format and new multiple images format
+    const hasImages = (postData.imageMetadata && postData.imageMetadata.length > 0) || postData.image;
+    const imageCount = postData.imageMetadata ? postData.imageMetadata.length : (postData.image ? 1 : 0);
 
     // Get user info
     const userCommand = new GetObjectCommand({
@@ -69,6 +73,12 @@ export const handler = async (event: any) => {
                   <td><a href="https://bsky.app/profile/${userInfo.blueskyUserId}/post/${blueskyPostUri.split('/').pop()}" target="_blank" class="link link-primary">View on Bluesky</a></td>
                 </tr>
                 ` : ''}
+                ${hasImages ? `
+                <tr>
+                  <th class="bg-base-200">Images</th>
+                  <td>${imageCount} image${imageCount > 1 ? 's' : ''} attached</td>
+                </tr>
+                ` : ''}
                 ${postData.contentLabels && postData.contentLabels.length > 0 ? `
                 <tr>
                   <th class="bg-base-200">Content Labels</th>
@@ -116,6 +126,32 @@ export const handler = async (event: any) => {
             </div>
           </div>
           ` : ''}
+        </div>
+      </div>
+      ` : ''}
+      
+      ${hasImages && postData.imageMetadata ? `
+      <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+          <h3 class="card-title text-xl text-primary">🖼️ 画像情報</h3>
+          <div class="space-y-4">
+            ${postData.imageMetadata.map((imageMeta: any, index: number) => `
+            <div class="card bg-base-200 p-4">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h4 class="font-semibold">画像 ${imageMeta.index}</h4>
+                  <p class="text-sm text-base-content/70">Format: ${imageMeta.format?.toUpperCase() || 'Unknown'}</p>
+                </div>
+              </div>
+              ${imageMeta.altText ? `
+              <div class="mt-3">
+                <h5 class="font-medium text-sm">ALT Text:</h5>
+                <p class="text-base-content bg-base-100 p-2 rounded mt-1">${imageMeta.altText}</p>
+              </div>
+              ` : ''}
+            </div>
+            `).join('')}
+          </div>
         </div>
       </div>
       ` : ''}

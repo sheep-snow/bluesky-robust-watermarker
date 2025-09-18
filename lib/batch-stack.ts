@@ -226,11 +226,42 @@ export class BatchStack extends cdk.Stack {
       outputPath: '$.Payload'
     });
 
-    // ワークフロー定義（スペクトラム透かし処理）
-    const definition = embedWatermarkTask
-      .next(postToBlueskyTask)
-      .next(generateProvenanceTask)
-      .next(updateUserListTask);
+    // 画像数をチェック
+    const checkImageCount = new stepfunctions.Choice(this, 'CheckImageCount');
+    
+    // 異常な画像数の場合は終了
+    const invalidImageCountEnd = new stepfunctions.Succeed(this, 'InvalidImageCountEnd', {
+      comment: 'Invalid image count (0 or >4), ending workflow'
+    });
+    
+    // 並列透かし埋め込み処理
+    const parallelWatermarkTasks = new stepfunctions.Map(this, 'ParallelWatermarkTasks', {
+      itemsPath: '$.imageMetadata',
+      maxConcurrency: 4,
+      parameters: {
+        'postId.$': '$.postId',
+        'userId.$': '$.userId',
+        'bucket.$': '$.bucket',
+        'imageIndex.$': '$.index',
+        'imageExtension.$': '$.extension'
+      }
+    });
+    parallelWatermarkTasks.iterator(embedWatermarkTask);
+
+    // ワークフロー定義
+    const definition = checkImageCount
+      .when(
+        stepfunctions.Condition.and(
+          stepfunctions.Condition.isPresent('$.imageMetadata'),
+          stepfunctions.Condition.numberGreaterThan('$.imageMetadata[0]', 0),
+          stepfunctions.Condition.numberLessThanEquals('$.imageMetadata[4]', 4)
+        ),
+        parallelWatermarkTasks
+          .next(postToBlueskyTask)
+          .next(generateProvenanceTask)
+          .next(updateUserListTask)
+      )
+      .otherwise(invalidImageCountEnd);
 
     const stateMachine = new stepfunctions.StateMachine(this, 'PostProcessingWorkflow', {
       stateMachineName: ResourcePolicy.getResourceName(props.appName, props.stage, 'post-processing'),
@@ -250,6 +281,7 @@ export class BatchStack extends cdk.Stack {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'post-trigger'),
       entry: 'lambda/batch/trigger.ts',
       handler: 'handler',
+      role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
       timeout: cdk.Duration.minutes(5),
       logGroup: triggerLogGroup,

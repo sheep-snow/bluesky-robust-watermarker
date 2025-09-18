@@ -78,38 +78,39 @@ def get_verification_result(verification_id: str) -> Optional[Dict]:
 
 
 def generate_result_page_html(verification_id: str, result: Dict) -> str:
-    """Generate HTML page for showing verification result."""
+    """Generate HTML page for showing verification result using DaisyUI layout."""
+    from lambda.common.ui_framework import wrapWithLayout
 
     if result["status"] == "processing":
-        return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>透かし検証中 - {APP_NAME}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-        .container {{ text-align: center; }}
-        .status {{ color: #2196F3; font-size: 1.2em; margin: 20px 0; }}
-        .loading {{ display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #2196F3; border-radius: 50%; animation: spin 1s linear infinite; }}
-        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        .refresh-btn {{ background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }}
-    </style>
-    <script>
-        setTimeout(() => {{ location.reload(); }}, 5000);
-    </script>
-</head>
-<body>
-    <div class="container">
-        <h1>透かし検証中</h1>
-        <div class="loading"></div>
-        <div class="status">画像を解析しています...</div>
-        <p>検証ID: {verification_id}</p>
-        <p>この画面は5秒後に自動更新されます。</p>
-        <button class="refresh-btn" onclick="location.reload()">手動更新</button>
-    </div>
-</body>
-</html>"""
+        content = f"""
+        <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+          <div class="hero-content text-center py-12">
+            <div class="max-w-md">
+              <h1 class="mb-5 text-4xl font-bold">🔍 透かし検証中</h1>
+              <p class="mb-5 text-lg">画像を解析しています...</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+          <div class="card-body text-center">
+            <div class="flex justify-center mb-4">
+              <span class="loading loading-spinner loading-lg text-primary"></span>
+            </div>
+            <h2 class="card-title justify-center text-2xl mb-4">処理中</h2>
+            <p class="text-base-content mb-4">検証ID: <span class="font-mono">{verification_id}</span></p>
+            <p class="text-sm text-base-content/70 mb-6">この画面は5秒後に自動更新されます。</p>
+            <div class="card-actions justify-center">
+              <button class="btn btn-primary" onclick="location.reload()">手動更新</button>
+            </div>
+          </div>
+        </div>
+        
+        <script>
+          setTimeout(() => {{ location.reload(); }}, 5000);
+        </script>
+        """
+        return wrapWithLayout(f"透かし検証中 - {APP_NAME}", content, "verify-watermark")
 
     elif result["status"] == "completed":
         result_data = result.get("result_data", {})
@@ -120,127 +121,158 @@ def generate_result_page_html(verification_id: str, result: Dict) -> str:
 
             if has_provenance:
                 provenance_url = result_data.get("provenance_url", "")
-                return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>透かし検証完了 - {APP_NAME}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-        .container {{ text-align: center; }}
-        .success {{ color: #4CAF50; font-size: 1.2em; margin: 20px 0; }}
-        .provenance-btn {{ background: #4CAF50; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; text-decoration: none; display: inline-block; }}
-        .back-btn {{ background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>✅ 透かしが見つかりました</h1>
-        <div class="success">この画像には {APP_NAME} の透かしが埋め込まれています</div>
-        <p>透かしID: {extracted_id}</p>
-        <p>来歴が利用可能です。</p>
-        <a href="{provenance_url}" class="provenance-btn">来歴を確認</a>
-        <br>
-        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
-    </div>
-</body>
-</html>"""
+                content = f"""
+                <div class="hero bg-gradient-to-r from-success to-accent text-success-content rounded-lg mb-8">
+                  <div class="hero-content text-center py-12">
+                    <div class="max-w-md">
+                      <h1 class="mb-5 text-4xl font-bold">✅ 透かしが見つかりました</h1>
+                      <p class="mb-5 text-lg">この画像には {APP_NAME} の透かしが埋め込まれています</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-xl">
+                  <div class="card-body text-center">
+                    <h2 class="card-title justify-center text-2xl mb-4 text-success">検証成功</h2>
+                    <div class="stats shadow mb-6">
+                      <div class="stat">
+                        <div class="stat-title">透かしID</div>
+                        <div class="stat-value text-lg font-mono">{extracted_id}</div>
+                      </div>
+                    </div>
+                    <p class="text-base-content mb-6">来歴が利用可能です。</p>
+                    <div class="card-actions justify-center gap-4">
+                      <a href="{provenance_url}" class="btn btn-success btn-lg">来歴を確認</a>
+                      <button class="btn btn-outline" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
+                    </div>
+                  </div>
+                </div>
+                """
+                return wrapWithLayout(f"透かし検証完了 - {APP_NAME}", content, "verify-watermark")
             else:
-                return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>透かし検証完了 - {APP_NAME}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-        .container {{ text-align: center; }}
-        .warning {{ color: #FF9800; font-size: 1.2em; margin: 20px 0; }}
-        .back-btn {{ background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚠️ 透かしは見つかりましたが...</h1>
-        <div class="warning">この透かしに対応する来歴が見つかりませんでした</div>
-        <p>透かしID: {extracted_id}</p>
-        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
-    </div>
-</body>
-</html>"""
+                content = f"""
+                <div class="hero bg-gradient-to-r from-warning to-accent text-warning-content rounded-lg mb-8">
+                  <div class="hero-content text-center py-12">
+                    <div class="max-w-md">
+                      <h1 class="mb-5 text-4xl font-bold">⚠️ 透かしは見つかりましたが...</h1>
+                      <p class="mb-5 text-lg">この透かしに対応する来歴が見つかりませんでした</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-xl">
+                  <div class="card-body text-center">
+                    <h2 class="card-title justify-center text-2xl mb-4 text-warning">来歴なし</h2>
+                    <div class="stats shadow mb-6">
+                      <div class="stat">
+                        <div class="stat-title">透かしID</div>
+                        <div class="stat-value text-lg font-mono">{extracted_id}</div>
+                      </div>
+                    </div>
+                    <div class="alert alert-warning mb-6">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                      <span>透かしは検出されましたが、対応する来歴情報が見つかりませんでした。</span>
+                    </div>
+                    <div class="card-actions justify-center">
+                      <button class="btn btn-primary" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
+                    </div>
+                  </div>
+                </div>
+                """
+                return wrapWithLayout(f"透かし検証完了 - {APP_NAME}", content, "verify-watermark")
         else:
-            return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>透かし検証完了 - {APP_NAME}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-        .container {{ text-align: center; }}
-        .error {{ color: #f44336; font-size: 1.2em; margin: 20px 0; }}
-        .back-btn {{ background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>❌ 透かしが見つかりません</h1>
-        <div class="error">この画像には {APP_NAME} の透かしが埋め込まれていません</div>
-        <p>この画像は {APP_NAME} で生成されていない可能性があります。</p>
-        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
-    </div>
-</body>
-</html>"""
+            content = f"""
+            <div class="hero bg-gradient-to-r from-error to-warning text-error-content rounded-lg mb-8">
+              <div class="hero-content text-center py-12">
+                <div class="max-w-md">
+                  <h1 class="mb-5 text-4xl font-bold">❌ 透かしが見つかりません</h1>
+                  <p class="mb-5 text-lg">この画像には {APP_NAME} の透かしが埋め込まれていません</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="card bg-base-100 shadow-xl">
+              <div class="card-body text-center">
+                <h2 class="card-title justify-center text-2xl mb-4 text-error">透かし未検出</h2>
+                <div class="alert alert-error mb-6">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span>この画像は {APP_NAME} で生成されていない可能性があります。</span>
+                </div>
+                <div class="card-actions justify-center">
+                  <button class="btn btn-primary" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
+                </div>
+              </div>
+            </div>
+            """
+            return wrapWithLayout(f"透かし検証完了 - {APP_NAME}", content, "verify-watermark")
 
     elif result["status"] == "error":
         error_message = result.get("error_message", "不明なエラー")
-        return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>検証エラー - {APP_NAME}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-        .container {{ text-align: center; }}
-        .error {{ color: #f44336; font-size: 1.2em; margin: 20px 0; }}
-        .back-btn {{ background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚠️ 検証中にエラーが発生しました</h1>
-        <div class="error">エラー詳細: {error_message}</div>
-        <p>検証ID: {verification_id}</p>
-        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
-    </div>
-</body>
-</html>"""
+        content = f"""
+        <div class="hero bg-gradient-to-r from-error to-warning text-error-content rounded-lg mb-8">
+          <div class="hero-content text-center py-12">
+            <div class="max-w-md">
+              <h1 class="mb-5 text-4xl font-bold">⚠️ 検証エラー</h1>
+              <p class="mb-5 text-lg">検証中にエラーが発生しました</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+          <div class="card-body text-center">
+            <h2 class="card-title justify-center text-2xl mb-4 text-error">処理エラー</h2>
+            <div class="stats shadow mb-6">
+              <div class="stat">
+                <div class="stat-title">検証ID</div>
+                <div class="stat-value text-lg font-mono">{verification_id}</div>
+              </div>
+            </div>
+            <div class="alert alert-error mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div>
+                <div class="font-bold">エラー詳細</div>
+                <div class="text-sm">{error_message}</div>
+              </div>
+            </div>
+            <div class="card-actions justify-center">
+              <button class="btn btn-primary" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
+            </div>
+          </div>
+        </div>
+        """
+        return wrapWithLayout(f"検証エラー - {APP_NAME}", content, "verify-watermark")
 
     else:
-        return f"""<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>不明なステータス - {APP_NAME}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-        .container {{ text-align: center; }}
-        .error {{ color: #f44336; font-size: 1.2em; margin: 20px 0; }}
-        .back-btn {{ background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚠️ 不明なステータス</h1>
-        <div class="error">ステータス: {result["status"]}</div>
-        <p>検証ID: {verification_id}</p>
-        <button class="back-btn" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
-    </div>
-</body>
-</html>"""
+        content = f"""
+        <div class="hero bg-gradient-to-r from-warning to-error text-warning-content rounded-lg mb-8">
+          <div class="hero-content text-center py-12">
+            <div class="max-w-md">
+              <h1 class="mb-5 text-4xl font-bold">⚠️ 不明なステータス</h1>
+              <p class="mb-5 text-lg">予期しないステータスが返されました</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card bg-base-100 shadow-xl">
+          <div class="card-body text-center">
+            <h2 class="card-title justify-center text-2xl mb-4 text-warning">不明なステータス</h2>
+            <div class="stats shadow mb-6">
+              <div class="stat">
+                <div class="stat-title">検証ID</div>
+                <div class="stat-value text-lg font-mono">{verification_id}</div>
+              </div>
+              <div class="stat">
+                <div class="stat-title">ステータス</div>
+                <div class="stat-value text-lg">{result["status"]}</div>
+              </div>
+            </div>
+            <div class="card-actions justify-center">
+              <button class="btn btn-primary" onclick="window.location.href='/verify-watermark'">別の画像を試す</button>
+            </div>
+          </div>
+        </div>
+        """
+        return wrapWithLayout(f"不明なステータス - {APP_NAME}", content, "verify-watermark")
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

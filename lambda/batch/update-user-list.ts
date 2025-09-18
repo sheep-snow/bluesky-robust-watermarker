@@ -43,10 +43,15 @@ export const handler = async (event: any) => {
             const postData = JSON.parse(await postDataResult.Body!.transformToString());
 
             if (postData.userId === userId) {
+              const hasImages = (postData.imageMetadata && postData.imageMetadata.length > 0) || postData.image;
+              const imageCount = postData.imageMetadata ? postData.imageMetadata.length : (postData.image ? 1 : 0);
+              
               userPosts.push({
                 postId: postIdFromPrefix,
                 createdAt: postData.createdAt,
                 text: postData.text || '',
+                hasImages: hasImages,
+                imageCount: imageCount,
                 provenanceUrl: `/provenance/${postIdFromPrefix}/`
               });
             }
@@ -83,6 +88,7 @@ export const handler = async (event: any) => {
           <div class="flex flex-wrap gap-2 mb-4">
             <div class="badge badge-soft">Created: ${new Date(post.createdAt).toLocaleString()}</div>
             <div class="badge badge-secondary">ID: ${post.postId}</div>
+            ${post.hasImages ? `<div class="badge badge-accent">${post.imageCount} image${post.imageCount > 1 ? 's' : ''}</div>` : ''}
           </div>
           ${post.text ? `
           <div class="card bg-base-200 p-4 mb-4">
