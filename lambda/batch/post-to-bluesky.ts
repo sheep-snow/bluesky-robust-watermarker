@@ -3,6 +3,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SSMClient } from '@aws-sdk/client-ssm';
 const { AtpAgent } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
+const sharp = require('sharp');
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
@@ -108,6 +109,10 @@ export const handler = async (event: any) => {
 
       console.log('Successfully retrieved image from S3, size:', imageBuffer.length);
 
+      // Get image dimensions
+      const metadata = await sharp(imageBuffer).metadata();
+      const { width, height } = metadata;
+
       // Upload image to Bluesky with correct encoding
       const encoding = imageFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
       const uploadResult = await agent.uploadBlob(imageBuffer, {
@@ -118,7 +123,11 @@ export const handler = async (event: any) => {
         $type: 'app.bsky.embed.images',
         images: [{
           image: uploadResult.data.blob,
-          alt: postData.text || ''
+          alt: postData.text || '',
+          aspectRatio: {
+            width: width,
+            height: height
+          }
         }]
       };
     } catch (imageError) {
