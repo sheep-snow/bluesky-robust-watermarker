@@ -3,6 +3,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SSMClient } from '@aws-sdk/client-ssm';
 const { AtpAgent } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
+const sharp = require('sharp');
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
@@ -19,9 +20,11 @@ async function decryptPassword(encryptedPassword: string) {
 }
 
 export const handler = async (event: any) => {
-  console.log('Post to Bluesky event:', JSON.stringify(event, null, 2));
+  console.log('Post to Bluesky handler started, event:', event);
 
-  const { postId, bucket } = event;
+  // Handle array input from Map task
+  const inputData = Array.isArray(event) ? event[0] : event;
+  const { postId, bucket = process.env.POST_DATA_BUCKET } = inputData;
 
   try {
     // Get post data first to extract correct userId
@@ -83,48 +86,56 @@ export const handler = async (event: any) => {
       };
     }
 
-    // Add image if exists - use the actual S3 key structure
-    try {
-      // Get image extension from post data or default to jpg
-      const imageExtension = postData.imageExtension || 'jpg';
-      const imageFormat = postData.imageFormat || 'jpeg';
-
-      // Use the actual S3 key structure: postId/image.extension
-      const imageKey = `${postId}/image.${imageExtension}`;
-
-      console.log('Attempting to get image from S3:', { bucket, imageKey });
-      console.log('Post data contains:', {
-        imageExtension: postData.imageExtension,
-        imageFormat: postData.imageFormat,
-        hasText: !!postData.text
-      });
-
-      const imageCommand = new GetObjectCommand({
-        Bucket: bucket,
-        Key: imageKey
-      });
-      const imageResult = await s3Client.send(imageCommand);
-      const imageBuffer = await imageResult.Body!.transformToByteArray();
-
-      console.log('Successfully retrieved image from S3, size:', imageBuffer.length);
-
-      // Upload image to Bluesky with correct encoding
-      const encoding = imageFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
-      const uploadResult = await agent.uploadBlob(imageBuffer, {
-        encoding: encoding
-      });
-
-      postContent.embed = {
-        $type: 'app.bsky.embed.images',
-        images: [{
-          image: uploadResult.data.blob,
-          alt: postData.text || ''
-        }]
-      };
-    } catch (imageError) {
-      console.log('Failed to get image from S3:', imageError);
-      console.log('Posting without image');
-      // Continue without image
+    // Add images if they exist
+    if (postData.imageMetadata && postData.imageMetadata.length > 0) {
+      try {
+        const images = [];
+        
+        for (const imageMeta of postData.imageMetadata) {
+          const imageKey = `${postId}/image${imageMeta.index}.${imageMeta.extension}`;
+          
+          console.log('Attempting to get image from S3:', { bucket, imageKey });
+          
+          const imageCommand = new GetObjectCommand({
+            Bucket: bucket,
+            Key: imageKey
+          });
+          const imageResult = await s3Client.send(imageCommand);
+          const imageBuffer = await imageResult.Body!.transformToByteArray();
+          
+          console.log(`Successfully retrieved image ${imageMeta.index} from S3, size:`, imageBuffer.length);
+          
+          // Get image dimensions
+          const metadata = await sharp(imageBuffer).metadata();
+          const { width, height } = metadata;
+          
+          // Upload image to Bluesky with correct encoding
+          const encoding = imageMeta.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+          const uploadResult = await agent.uploadBlob(imageBuffer, {
+            encoding: encoding
+          });
+          
+          images.push({
+            image: uploadResult.data.blob,
+            alt: imageMeta.altText || '',
+            aspectRatio: {
+              width: width,
+              height: height
+            }
+          });
+        }
+        
+        if (images.length > 0) {
+          postContent.embed = {
+            $type: 'app.bsky.embed.images',
+            images: images
+          };
+        }
+      } catch (imageError) {
+        console.log('Failed to get images from S3:', imageError);
+        console.log('Posting without images');
+        // Continue without images
+      }
     }
 
     // Post to Bluesky
@@ -136,7 +147,7 @@ export const handler = async (event: any) => {
     console.log('Posted to Bluesky:', blueskyResult.data);
 
     return {
-      ...event,
+      ...inputData,
       userId: userId, // Use the correct userId from post.json
       blueskyPostUri: blueskyResult.data.uri,
       blueskyPostCid: blueskyResult.data.cid,

@@ -331,14 +331,24 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                   <div class="form-control">
                     <label class="label">
                       <span class="label-text font-semibold">投稿文</span>
+                      <span class="label-text-alt">最大300文字</span>
                     </label>
-                    <textarea id="postText" rows="4" placeholder="投稿文..." class="textarea textarea-bordered"></textarea>
+                    <textarea id="postText" rows="4" placeholder="投稿文..." class="textarea textarea-bordered" maxlength="300"></textarea>
                   </div>
                   <div class="form-control">
                     <label class="label">
-                      <span class="label-text font-semibold">Image</span>
+                      <span class="label-text font-semibold">画像 (最大4枚)</span>
+                      <div class="flex gap-2">
+                        <button type="button" id="addImageBtn" class="btn btn-sm btn-outline">+ 追加</button>
+                        <button type="button" id="removeImageBtn" class="btn btn-sm btn-outline">- 削除</button>
+                      </div>
                     </label>
-                    <input type="file" id="postImage" accept="image/*" class="file-input file-input-bordered" />
+                    <div id="imageInputs" class="space-y-4">
+                      <div class="grid grid-cols-2 gap-4 image-row" data-index="1">
+                        <input type="file" id="postImage1" accept="image/*" class="file-input file-input-bordered" />
+                        <textarea id="altText1" rows="2" placeholder="画像1の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>
+                      </div>
+                    </div>
                   </div>
                   <details class="collapse bg-base-100 border-base-300 border">
                     <summary class="collapse-title font-semibold">ラベル</summary>
@@ -371,7 +381,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                       </div>
                     </div>
                   </details>
-                  <button type="submit" class="btn btn-accent w-full">投稿</button>
+                  <button type="submit" id="postSubmitBtn" class="btn btn-accent w-full" disabled>投稿</button>
                 </form>
               </div>
             </div>
@@ -449,6 +459,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             // Load existing user info
             loadUserInfo();
             
+            // Initialize image input management
+            initializeImageInputs();
+            
+            // Initialize submit button validation
+            validateSubmitButton();
+            
             // Handle adult content checkbox exclusivity
             document.querySelectorAll('.adult-content-checkbox').forEach(checkbox => {
               checkbox.addEventListener('change', function() {
@@ -495,7 +511,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             document.getElementById('postForm').addEventListener('submit', async (e) => {
               e.preventDefault();
               const text = document.getElementById('postText').value;
-              const imageFile = document.getElementById('postImage').files[0];
               
               // Get content labels
               const contentLabels = [];
@@ -503,25 +518,40 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               if (adultContentCheckboxes.length > 0) contentLabels.push(adultContentCheckboxes[0].value);
               if (document.getElementById('labelGraphicMedia').checked) contentLabels.push('graphic-media');
               
-              // Check file size limit (3MB)
-              if (imageFile && imageFile.size > 3 * 1024 * 1024) {
-                alert('画像ファイルサイズは3MB以下にしてください。');
-                return;
-              }
+              // Process multiple images
+              const images = [];
+              const imageRows = document.querySelectorAll('.image-row');
               
-              let imageBase64 = null;
-              if (imageFile) {
-                // Convert image to base64
-                const reader = new FileReader();
-                imageBase64 = await new Promise((resolve) => {
-                  reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/...;base64, prefix
-                  reader.readAsDataURL(imageFile);
-                });
+              for (let i = 0; i < imageRows.length; i++) {
+                const row = imageRows[i];
+                const index = row.dataset.index;
+                const imageFile = document.getElementById('postImage' + index).files[0];
+                const altText = document.getElementById('altText' + index).value;
+                
+                if (imageFile) {
+                  // Check file size limit (3MB)
+                  if (imageFile.size > 3 * 1024 * 1024) {
+                    alert('画像' + index + 'のファイルサイズは3MB以下にしてください。');
+                    return;
+                  }
+                  
+                  // Convert image to base64
+                  const reader = new FileReader();
+                  const imageBase64 = await new Promise((resolve) => {
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.readAsDataURL(imageFile);
+                  });
+                  
+                  images.push({
+                    image: imageBase64,
+                    altText: altText
+                  });
+                }
               }
               
               const postData = {
                 text: text,
-                image: imageBase64,
+                images: images,
                 contentLabels: contentLabels
               };
               
@@ -657,6 +687,76 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             }, 5000); // Check every 5 seconds
           }
           
+          function initializeImageInputs() {
+            const addBtn = document.getElementById('addImageBtn');
+            const removeBtn = document.getElementById('removeImageBtn');
+            
+            addBtn.addEventListener('click', () => {
+              const container = document.getElementById('imageInputs');
+              const currentRows = container.querySelectorAll('.image-row').length;
+              
+              if (currentRows < 4) {
+                const newIndex = currentRows + 1;
+                const newRow = document.createElement('div');
+                newRow.className = 'grid grid-cols-2 gap-4 image-row';
+                newRow.dataset.index = newIndex;
+                newRow.innerHTML = 
+                  '<input type="file" id="postImage' + newIndex + '" accept="image/*" class="file-input file-input-bordered" />' +
+                  '<textarea id="altText' + newIndex + '" rows="2" placeholder="画像' + newIndex + 'の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>';
+                
+                // Add event listener to new file input
+                newRow.querySelector('input[type="file"]').addEventListener('change', validateSubmitButton);
+                container.appendChild(newRow);
+              }
+              
+              updateImageButtons();
+            });
+            
+            removeBtn.addEventListener('click', () => {
+              const container = document.getElementById('imageInputs');
+              const rows = container.querySelectorAll('.image-row');
+              
+              if (rows.length > 1) {
+                rows[rows.length - 1].remove();
+              }
+              
+              updateImageButtons();
+              validateSubmitButton();
+            });
+            
+            // Add event listener to initial file input
+            document.getElementById('postImage1').addEventListener('change', validateSubmitButton);
+            
+            updateImageButtons();
+          }
+          
+          function validateSubmitButton() {
+            const imageRows = document.querySelectorAll('.image-row');
+            const submitBtn = document.getElementById('postSubmitBtn');
+            let hasImage = false;
+            
+            for (const row of imageRows) {
+              const index = row.dataset.index;
+              const fileInput = document.getElementById('postImage' + index);
+              if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                hasImage = true;
+                break;
+              }
+            }
+            
+            submitBtn.disabled = !hasImage;
+          }
+          
+          function updateImageButtons() {
+            const container = document.getElementById('imageInputs');
+            const currentRows = container.querySelectorAll('.image-row').length;
+            const addBtn = document.getElementById('addImageBtn');
+            const removeBtn = document.getElementById('removeImageBtn');
+            
+            addBtn.disabled = currentRows >= 4;
+            removeBtn.disabled = currentRows <= 1;
+          }
+          
           function logout() {
             localStorage.removeItem('access_token');
             localStorage.removeItem('id_token');
@@ -703,8 +803,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           const body = sanitizeUserInput(rawBody);
           // Log body without image data
           const logBody = { ...body };
-          if (logBody.image) {
-            logBody.image = `[IMAGE_DATA_${logBody.image.length}_BYTES]`;
+          if (logBody.images) {
+            logBody.images = logBody.images.map((img, i) => ({
+              altText: img.altText,
+              image: `[IMAGE_DATA_${img.image.length}_BYTES]`
+            }));
           }
           console.log('Post creation body:', JSON.stringify(logBody, null, 2));
           const postId = PostIdGenerator.generate();
@@ -713,40 +816,52 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             postId,
             userId,
             text: body.text || '',
-            image: body.image || null,
+            images: body.images || [],
             contentLabels: body.contentLabels || [],
             createdAt: new Date().toISOString()
           };
 
-          // Save image if provided with format detection
-          let imageFormat = null;
-          let imageExtension = null;
-          if (body.image) {
-            const imageBuffer = Buffer.from(body.image, 'base64');
-            imageFormat = detectImageFormat(new Uint8Array(imageBuffer));
-            imageExtension = getImageExtension(imageFormat);
-            const contentType = getContentType(imageFormat);
+          // Save images if provided with format detection
+          const imageMetadata = [];
+          if (body.images && body.images.length > 0) {
+            for (let i = 0; i < body.images.length; i++) {
+              const imageData = body.images[i];
+              const imageBuffer = Buffer.from(imageData.image, 'base64');
+              const imageFormat = detectImageFormat(new Uint8Array(imageBuffer));
+              const imageExtension = getImageExtension(imageFormat);
+              const contentType = getContentType(imageFormat);
 
-            const imageCommand = new PutObjectCommand({
-              Bucket: process.env.POST_DATA_BUCKET,
-              Key: `${postId}/image.${imageExtension}`,
-              Body: imageBuffer,
-              ContentType: contentType
-            });
-            await s3Client.send(imageCommand);
+              const imageCommand = new PutObjectCommand({
+                Bucket: process.env.POST_DATA_BUCKET,
+                Key: `${postId}/image${i + 1}.${imageExtension}`,
+                Body: imageBuffer,
+                ContentType: contentType
+              });
+              await s3Client.send(imageCommand);
+
+              imageMetadata.push({
+                index: i + 1,
+                format: imageFormat,
+                extension: imageExtension,
+                altText: imageData.altText || ''
+              });
+            }
           }
 
-          // Save post data to S3
-          const postDataWithImage = {
-            ...postData,
-            ...(imageFormat && { imageFormat: imageFormat }),
-            ...(imageExtension && { imageExtension: imageExtension })
+          // Save post data to S3 (without image data)
+          const postDataForStorage = {
+            postId,
+            userId,
+            text: body.text || '',
+            contentLabels: body.contentLabels || [],
+            createdAt: new Date().toISOString(),
+            imageMetadata: imageMetadata
           };
 
           const putCommand = new PutObjectCommand({
             Bucket: process.env.POST_DATA_BUCKET,
             Key: `${postId}/post.json`,
-            Body: JSON.stringify(postDataWithImage),
+            Body: JSON.stringify(postDataForStorage),
             ContentType: 'application/json'
           });
           await s3Client.send(putCommand);
@@ -781,8 +896,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           const body = sanitizeUserInput(rawBody);
           // Log body without sensitive data to avoid large logs and security issues
           const logBody = { ...body };
-          if (logBody.image) {
-            logBody.image = `[IMAGE_DATA_${logBody.image.length}_BYTES]`;
+          if (logBody.images) {
+            logBody.images = logBody.images.map((img, i) => ({
+              altText: img.altText,
+              image: `[IMAGE_DATA_${img.image.length}_BYTES]`
+            }));
           }
           if (logBody.blueskyAppPassword) {
             logBody.blueskyAppPassword = '[REDACTED]';

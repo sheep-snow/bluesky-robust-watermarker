@@ -146,6 +146,10 @@ export class BatchStack extends cdk.Stack {
       ...ResourcePolicy.getLambdaDefaults(props.stage),
       timeout: cdk.Duration.minutes(5),
       logGroup: postToBlueskyLogGroup,
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        nodeModules: ['sharp']
+      },
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
@@ -226,16 +230,62 @@ export class BatchStack extends cdk.Stack {
       outputPath: '$.Payload'
     });
 
-    // ワークフロー定義（スペクトラム透かし処理）
-    const definition = embedWatermarkTask
-      .next(postToBlueskyTask)
-      .next(generateProvenanceTask)
-      .next(updateUserListTask);
+    // 画像数をチェック
+    const checkImageCount = new stepfunctions.Choice(this, 'CheckImageCount');
+    
+    // 異常な画像数の場合は終了
+    const invalidImageCountEnd = new stepfunctions.Succeed(this, 'InvalidImageCountEnd', {
+      comment: 'Invalid image count (0 or >4), ending workflow'
+    });
+    
+    // 並列透かし埋め込み処理
+    const parallelWatermarkTasks = new stepfunctions.Map(this, 'ParallelWatermarkTasks', {
+      itemsPath: '$.imageMetadata',
+      maxConcurrency: 4,
+      parameters: {
+        'postId.$': '$$.Execution.Input.postId',
+        'userId.$': '$$.Execution.Input.userId',
+        'bucket.$': '$$.Execution.Input.bucket',
+        'imageIndex.$': '$$.Map.Item.Value.index',
+        'imageExtension.$': '$$.Map.Item.Value.extension'
+      }
+    });
+    parallelWatermarkTasks.iterator(embedWatermarkTask);
+
+    // ワークフロー定義
+    const definition = checkImageCount
+      .when(
+        stepfunctions.Condition.isPresent('$.imageMetadata[0]'),
+        parallelWatermarkTasks
+          .next(postToBlueskyTask)
+          .next(generateProvenanceTask)
+          .next(updateUserListTask)
+      )
+      .otherwise(invalidImageCountEnd);
 
     const stateMachine = new stepfunctions.StateMachine(this, 'PostProcessingWorkflow', {
       stateMachineName: ResourcePolicy.getResourceName(props.appName, props.stage, 'post-processing'),
       definition,
       timeout: cdk.Duration.minutes(30)
+    });
+
+    // SQSトリガーLambda用の専用ロール
+    const triggerLambdaRole = new iam.Role(this, 'TriggerLambdaRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')
+      ],
+      inlinePolicies: {
+        S3Access: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: ['s3:GetObject'],
+              resources: [`${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-arn`)}/*`]
+            })
+          ]
+        })
+      }
     });
 
     // SQSトリガーLambda
@@ -250,6 +300,7 @@ export class BatchStack extends cdk.Stack {
       functionName: ResourcePolicy.getResourceName(props.appName, props.stage, 'post-trigger'),
       entry: 'lambda/batch/trigger.ts',
       handler: 'handler',
+      role: triggerLambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
       timeout: cdk.Duration.minutes(5),
       logGroup: triggerLogGroup,

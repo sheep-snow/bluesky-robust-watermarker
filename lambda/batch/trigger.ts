@@ -1,8 +1,10 @@
 // Force cache invalidation - updated at 10:47
 import { SQSEvent } from 'aws-lambda';
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 const stepFunctionsClient = new SFNClient({ region: process.env.AWS_REGION });
+const s3Client = new S3Client({ region: process.env.AWS_REGION });
 
 export const handler = async (event: SQSEvent) => {
   console.log('SQS trigger received:', JSON.stringify(event, null, 2));
@@ -12,11 +14,31 @@ export const handler = async (event: SQSEvent) => {
       const message = JSON.parse(record.body);
       console.log('Processing message:', message);
 
+      // Get post data to check for images
+      let imageMetadata = [];
+      try {
+        const postCommand = new GetObjectCommand({
+          Bucket: message.bucket,
+          Key: `${message.postId}/post.json`
+        });
+        const postResult = await s3Client.send(postCommand);
+        const postDataString = await postResult.Body!.transformToString();
+        const postData = JSON.parse(postDataString);
+        console.log('Post data loaded, imageMetadata count:', postData.imageMetadata?.length || 0);
+        
+        if (postData.imageMetadata && postData.imageMetadata.length > 0) {
+          imageMetadata = postData.imageMetadata;
+        }
+      } catch (error) {
+        console.log('Failed to load post data, proceeding without images:', error);
+      }
+
       const executionInput = {
         postId: message.postId,
         userId: message.userId,
         bucket: message.bucket,
-        timestamp: message.timestamp
+        timestamp: message.timestamp,
+        imageMetadata: imageMetadata
       };
 
       const command = new StartExecutionCommand({
