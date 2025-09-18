@@ -146,6 +146,9 @@ export class BatchStack extends cdk.Stack {
       ...ResourcePolicy.getLambdaDefaults(props.stage),
       timeout: cdk.Duration.minutes(5),
       logGroup: postToBlueskyLogGroup,
+      bundling: {
+        externalModules: ['sharp']
+      },
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,

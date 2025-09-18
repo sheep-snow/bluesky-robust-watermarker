@@ -346,7 +346,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                     <div id="imageInputs" class="space-y-4">
                       <div class="grid grid-cols-2 gap-4 image-row" data-index="1">
                         <input type="file" id="postImage1" accept="image/*" class="file-input file-input-bordered" />
-                        <textarea id="altText1" rows="2" placeholder="画像1の説明..." class="textarea textarea-bordered" maxlength="1000"></textarea>
+                        <textarea id="altText1" rows="2" placeholder="画像1の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>
                       </div>
                     </div>
                   </div>
@@ -525,13 +525,13 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               for (let i = 0; i < imageRows.length; i++) {
                 const row = imageRows[i];
                 const index = row.dataset.index;
-                const imageFile = document.getElementById(`postImage${index}`).files[0];
-                const altText = document.getElementById(`altText${index}`).value;
+                const imageFile = document.getElementById('postImage' + index).files[0];
+                const altText = document.getElementById('altText' + index).value;
                 
                 if (imageFile) {
                   // Check file size limit (3MB)
                   if (imageFile.size > 3 * 1024 * 1024) {
-                    alert(`画像${index}のファイルサイズは3MB以下にしてください。`);
+                    alert('画像' + index + 'のファイルサイズは3MB以下にしてください。');
                     return;
                   }
                   
@@ -700,10 +700,9 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                 const newRow = document.createElement('div');
                 newRow.className = 'grid grid-cols-2 gap-4 image-row';
                 newRow.dataset.index = newIndex;
-                newRow.innerHTML = `
-                  <input type="file" id="postImage${newIndex}" accept="image/*" class="file-input file-input-bordered" />
-                  <textarea id="altText${newIndex}" rows="2" placeholder="画像${newIndex}の説明..." class="textarea textarea-bordered" maxlength="1000"></textarea>
-                `;
+                newRow.innerHTML = 
+                  '<input type="file" id="postImage' + newIndex + '" accept="image/*" class="file-input file-input-bordered" />' +
+                  '<textarea id="altText' + newIndex + '" rows="2" placeholder="画像' + newIndex + 'の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>';
                 
                 // Add event listener to new file input
                 newRow.querySelector('input[type="file"]').addEventListener('change', validateSubmitButton);
@@ -738,7 +737,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             
             for (const row of imageRows) {
               const index = row.dataset.index;
-              const fileInput = document.getElementById(`postImage${index}`);
+              const fileInput = document.getElementById('postImage' + index);
               if (fileInput && fileInput.files && fileInput.files.length > 0) {
                 hasImage = true;
                 break;
