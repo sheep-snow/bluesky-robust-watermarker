@@ -418,6 +418,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                 <div>
                   <p class="text-base-content">Post ID: <span id="processingPostId" class="font-mono font-bold"></span></p>
                   <p class="text-sm text-base-content/70 mt-2" id="processingStatus">Generating provenance page...</p>
+                  <p class="text-xs text-base-content/50 mt-1" id="processingCountdown">タイムアウトまで: 180秒</p>
                 </div>
               </div>
               <div class="mt-6">
@@ -437,13 +438,106 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                 </div>
               </div>
             </div>
+            <div class="modal-action">
+              <button class="btn btn-sm" onclick="document.getElementById('processingModal').close()">閉じる</button>
+            </div>
           </div>
-          <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-          </form>
         </dialog>
         
         <script>
+          // Progress polling function with timeout
+          const startProgressPolling = async (taskId) => {
+            const startTime = Date.now();
+            const timeoutMs = 180000; // 180 seconds
+            let timeoutReached = false;
+            
+            const updateCountdown = () => {
+              const elapsed = Date.now() - startTime;
+              const remaining = Math.max(0, Math.ceil((timeoutMs - elapsed) / 1000));
+              const countdownEl = document.getElementById('processingCountdown');
+              if (countdownEl) {
+                countdownEl.textContent = 'タイムアウトまで: ' + remaining + '秒';
+                if (remaining <= 30) {
+                  countdownEl.style.color = '#ef4444';
+                }
+              }
+              return remaining > 0;
+            };
+            
+            const pollProgress = async () => {
+              if (!updateCountdown()) {
+                timeoutReached = true;
+                document.getElementById('processingModal').close();
+                alert('処理がタイムアウトしました。時間をおいて再度お試しください。');
+                return;
+              }
+              
+              try {
+                const response = await fetch('/progress/' + taskId, {
+                  headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                
+                if (response.ok) {
+                  const progress = await response.json();
+                  updateProgressModal(progress);
+                  
+                  if (!progress.completed && !timeoutReached) {
+                    const interval = progress.status === 'error' ? 1000 : 2000;
+                    setTimeout(pollProgress, interval);
+                  } else if (progress.completed) {
+                    setTimeout(() => {
+                      document.getElementById('processingModal').close();
+                      if (progress.status === 'completed') {
+                        alert('投稿が完了しました！');
+                        location.reload();
+                      } else {
+                        alert('エラーが発生しました: ' + (progress.error || 'Unknown error'));
+                      }
+                    }, progress.status === 'error' ? 500 : 1000);
+                  }
+                }
+              } catch (error) {
+                console.error('Progress polling error:', error);
+                if (!timeoutReached) {
+                  setTimeout(() => {
+                    document.getElementById('processingModal').close();
+                    alert('進捗の取得に失敗しました。ページを更新してください。');
+                  }, 2000);
+                }
+              }
+            };
+            
+            pollProgress();
+          };
+          
+          // Update progress modal
+          const updateProgressModal = (progress) => {
+            document.getElementById('processingProgress').value = progress.progress || 0;
+            document.getElementById('processingStatus').textContent = progress.message || 'Processing...';
+            
+            // Update step indicators
+            const steps = ['watermark', 'bluesky', 'provenance'];
+            steps.forEach((step, index) => {
+              const element = document.getElementById('step-' + step);
+              const threshold = (index + 1) * 33;
+              if (progress.progress >= threshold) {
+                element.style.opacity = '1';
+                element.style.color = '#10b981';
+              } else if (progress.status === 'error') {
+                element.style.opacity = '1';
+                element.style.color = '#ef4444';
+              } else {
+                element.style.opacity = '0.5';
+              }
+            });
+            
+            // Show error state
+            if (progress.status === 'error') {
+              document.getElementById('processingStatus').style.color = '#ef4444';
+              document.querySelector('.loading-spinner').style.display = 'none';
+            }
+          };
+          
           // Check authentication
           const accessToken = localStorage.getItem('access_token');
           const idToken = localStorage.getItem('id_token');
@@ -508,8 +602,21 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             });
             
             // Post form submission
+            let isSubmitting = false;
             document.getElementById('postForm').addEventListener('submit', async (e) => {
               e.preventDefault();
+              
+              // Prevent double submission
+              if (isSubmitting) {
+                return;
+              }
+              isSubmitting = true;
+              
+              // Disable submit button
+              const submitBtn = document.getElementById('postSubmitBtn');
+              submitBtn.disabled = true;
+              submitBtn.textContent = '処理中...';
+              
               const text = document.getElementById('postText').value;
               
               // Get content labels
@@ -521,6 +628,16 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               // Process multiple images
               const images = [];
               const imageRows = document.querySelectorAll('.image-row');
+              
+              // Generate task ID for progress tracking
+              const taskId = 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+              
+              // Show processing modal
+              document.getElementById('processingPostId').textContent = taskId;
+              document.getElementById('processingModal').showModal();
+              
+              // Start progress polling
+              startProgressPolling(taskId);
               
               for (let i = 0; i < imageRows.length; i++) {
                 const row = imageRows[i];
@@ -578,6 +695,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               } else {
                 const errorData = await response.json();
                 alert('投稿に失敗しました: ' + (errorData.error || 'Unknown error'));
+                
+                // Re-enable submit button on error
+                isSubmitting = false;
+                submitBtn.disabled = false;
+                submitBtn.textContent = '投稿';
               }
             });
           }
@@ -744,7 +866,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               }
             }
             
-            submitBtn.disabled = !hasImage;
+            // Don't enable if currently submitting
+            if (typeof isSubmitting === 'undefined' || !isSubmitting) {
+              submitBtn.disabled = !hasImage;
+            }
           }
           
           function updateImageButtons() {

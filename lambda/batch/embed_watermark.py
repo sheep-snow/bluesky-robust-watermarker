@@ -9,6 +9,22 @@ from io import BytesIO
 import boto3
 from PIL import Image
 
+# Import progress utilities
+progress_utils_spec = importlib.util.spec_from_file_location(
+    "progress_utils",
+    os.path.join(os.path.dirname(__file__), "..", "common", "progress_utils.py"),
+)
+if progress_utils_spec and progress_utils_spec.loader:
+    progress_utils = importlib.util.module_from_spec(progress_utils_spec)
+    progress_utils_spec.loader.exec_module(progress_utils)
+    update_progress = progress_utils.update_progress
+    mark_failed = progress_utils.mark_failed
+else:
+    def update_progress(task_id, status, progress, message, error=None):
+        pass
+    def mark_failed(task_id, error_message, progress=0):
+        pass
+
 # Import common watermark utilities using importlib to avoid lambda keyword issues
 watermark_utils_spec = importlib.util.spec_from_file_location(
     "watermark_utils",
@@ -380,8 +396,12 @@ def embed_watermark(
         Response dictionary
     """
     logger.info(f"Embedding Trustmark watermark for: bucket={bucket_name}, key={key}")
-
+    
+    task_id = original_event.get('postId') if original_event else None
+    
     try:
+        if task_id:
+            update_progress(task_id, 'watermarking', 10, 'Starting watermark embedding')
         # Download image from S3
         logger.info("Downloading image from S3...")
         response = s3_client.get_object(Bucket=bucket_name, Key=key)
@@ -389,6 +409,8 @@ def embed_watermark(
         logger.info(f"Downloaded image size: {len(original_image_data)} bytes")
 
         # Step 1: Compress image if over 1MB before watermarking
+        if task_id:
+            update_progress(task_id, 'watermarking', 20, 'Compressing image')
         compressed_image_data = compress_image_to_size_limit(original_image_data)
         logger.info(f"Pre-watermark compression: {len(original_image_data)} -> {len(compressed_image_data)} bytes")
 
@@ -398,6 +420,8 @@ def embed_watermark(
             raise ValueError("postId not found in watermarkData")
 
         # Step 2: Embed watermark using the compressed image
+        if task_id:
+            update_progress(task_id, 'watermarking', 50, 'Embedding watermark')
         watermarked_data = embed_watermark_to_image_data(compressed_image_data, str(nano_id))
         logger.info(f"After watermark embedding: {len(watermarked_data)} bytes")
 
@@ -408,6 +432,8 @@ def embed_watermark(
             logger.info(f"Final compressed size: {len(watermarked_data)} bytes")
 
         # Verify the watermark was embedded correctly using common verification function
+        if task_id:
+            update_progress(task_id, 'watermarking', 80, 'Verifying watermark')
         verification_result = verify_watermark_embedding(watermarked_data, str(nano_id))
 
         extracted_id = verification_result.get("extractedId")
@@ -423,6 +449,8 @@ def embed_watermark(
             ContentType="image/png",
         )
 
+        if task_id:
+            update_progress(task_id, 'watermarking', 100, 'Watermark embedding completed')
         logger.info("Watermark embedding and verification completed successfully")
 
         # For Step Functions, return the original event parameters directly
@@ -466,4 +494,6 @@ def embed_watermark(
 
     except Exception as error:
         logger.error(f"Error in embed_watermark: {error}", exc_info=True)
+        if task_id:
+            mark_failed(task_id, f"Watermark embedding failed: {str(error)}", 20)
         raise Exception(f"Failed to embed watermark: {str(error)}")

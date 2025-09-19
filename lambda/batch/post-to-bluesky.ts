@@ -1,9 +1,38 @@
 import { DecryptCommand, KMSClient } from '@aws-sdk/client-kms';
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SSMClient } from '@aws-sdk/client-ssm';
 const { AtpAgent } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
 const sharp = require('sharp');
+
+const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
+
+const updateProgress = async (taskId: string, status: string, progress: number, message: string, error?: string) => {
+  try {
+    const tableName = process.env.PROCESSING_PROGRESS_TABLE_NAME;
+    if (!tableName) return;
+    
+    const item: any = {
+      task_id: { S: taskId },
+      status: { S: status },
+      progress: { N: progress.toString() },
+      message: { S: message },
+      updated_at: { S: Math.floor(Date.now() / 1000).toString() },
+      ttl: { N: (Math.floor(Date.now() / 1000) + 86400).toString() }
+    };
+    
+    if (error) item.error = { S: error };
+    
+    await dynamodb.send(new PutItemCommand({ TableName: tableName, Item: item }));
+  } catch (e) {
+    console.error('Failed to update progress:', e);
+  }
+};
+
+const markFailed = async (taskId: string, errorMessage: string, progress: number = 40) => {
+  await updateProgress(taskId, 'error', progress, 'Bluesky posting failed', errorMessage);
+};
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
@@ -107,8 +136,9 @@ export const handler = async (event: any) => {
   // Handle array input from Map task
   const inputData = Array.isArray(event) ? event[0] : event;
   const { postId, bucket = process.env.POST_DATA_BUCKET } = inputData;
-
+  
   try {
+    await updateProgress(postId, 'posting', 35, 'Starting Bluesky post');
     // Get post data first to extract correct userId
     console.log('Attempting to get post.json from S3:', { bucket, key: `${postId}/post.json` });
     const postCommand = new GetObjectCommand({
@@ -144,6 +174,7 @@ export const handler = async (event: any) => {
     console.log('Password decrypted, length:', blueskyPassword.length);
 
     // Initialize Bluesky agent
+    await updateProgress(postId, 'posting', 40, 'Connecting to Bluesky');
     const agent = new AtpAgent({ service: 'https://bsky.social' });
     console.log('Attempting login with identifier:', userInfo.blueskyUserId);
     await agent.login({
@@ -229,12 +260,15 @@ export const handler = async (event: any) => {
     }
 
     // Post to Bluesky
+    await updateProgress(postId, 'posting', 60, 'Publishing to Bluesky');
     const blueskyResult = await agent.api.com.atproto.repo.createRecord({
       repo: agent.session.did,
       collection: 'app.bsky.feed.post',
       record: postContent
     });
     console.log('Posted to Bluesky:', blueskyResult.data);
+    
+    await updateProgress(postId, 'posting', 70, 'Bluesky post completed');
 
     return {
       ...inputData,
@@ -246,6 +280,7 @@ export const handler = async (event: any) => {
 
   } catch (error) {
     console.error('Bluesky posting failed:', error);
+    await markFailed(postId, error.message || 'Unknown error');
     throw error;
   }
 };

@@ -1,5 +1,34 @@
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { wrapWithLayout } from '../common/ui-framework';
+
+const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
+
+const updateProgress = async (taskId: string, status: string, progress: number, message: string, error?: string) => {
+  try {
+    const tableName = process.env.PROCESSING_PROGRESS_TABLE_NAME;
+    if (!tableName) return;
+    
+    const item: any = {
+      task_id: { S: taskId },
+      status: { S: status },
+      progress: { N: progress.toString() },
+      message: { S: message },
+      updated_at: { S: Math.floor(Date.now() / 1000).toString() },
+      ttl: { N: (Math.floor(Date.now() / 1000) + 86400).toString() }
+    };
+    
+    if (error) item.error = { S: error };
+    
+    await dynamodb.send(new PutItemCommand({ TableName: tableName, Item: item }));
+  } catch (e) {
+    console.error('Failed to update progress:', e);
+  }
+};
+
+const markFailed = async (taskId: string, errorMessage: string, progress: number = 80) => {
+  await updateProgress(taskId, 'error', progress, 'Provenance generation failed', errorMessage);
+};
 
 const APP_NAME = process.env.APP_NAME || 'brw';
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
@@ -12,6 +41,7 @@ export const handler = async (event: any) => {
   const { postId, userId, bucket, blueskyPostUri, postedAt } = eventData;
 
   try {
+    await updateProgress(postId, 'generating', 75, 'Generating provenance page');
     // Get post data
     const postCommand = new GetObjectCommand({
       Bucket: bucket,
@@ -227,6 +257,7 @@ export const handler = async (event: any) => {
     console.log('Generated provenance page with content labels:', postData.contentLabels || []);
 
     // Save provenance page to public bucket
+    await updateProgress(postId, 'generating', 90, 'Saving provenance page');
     const provenanceCommand = new PutObjectCommand({
       Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
       Key: `provenance/${postId}/index.html`,
@@ -240,6 +271,8 @@ export const handler = async (event: any) => {
 
     const provenanceUrl = `https://${process.env.PROVENANCE_PUBLIC_BUCKET}.s3.amazonaws.com/provenance/${postId}/index.html`;
 
+    await updateProgress(postId, 'generating', 95, 'Provenance page completed');
+    
     return {
       ...eventData,
       provenanceUrl,
@@ -248,6 +281,7 @@ export const handler = async (event: any) => {
 
   } catch (error) {
     console.error('Provenance generation failed:', error);
+    await markFailed(postId, error.message || 'Unknown error');
     throw error;
   }
 };

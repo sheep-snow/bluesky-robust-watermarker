@@ -6,12 +6,14 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 import { ParamsResourceStack } from './params-resource-stack';
+import { DatabaseStack } from './database-stack';
 import { ResourcePolicy } from './resource-policy';
 
 export interface MyPageStackProps extends cdk.StackProps {
   stage: string;
   appName: string;
   paramsResourceStack: ParamsResourceStack;
+  databaseStack: DatabaseStack;
 }
 
 export class MyPageStack extends cdk.Stack {
@@ -127,6 +129,18 @@ export class MyPageStack extends cdk.Stack {
               resources: [`arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`]
             })
           ]
+        }),
+        DynamoDBAccess: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'dynamodb:PutItem',
+                'dynamodb:UpdateItem'
+              ],
+              resources: [props.databaseStack.processingProgressTable.tableArn]
+            })
+          ]
         })
       }
     });
@@ -152,7 +166,8 @@ export class MyPageStack extends cdk.Stack {
         POST_DATA_BUCKET: this.postDataBucket.bucketName,
         POST_QUEUE_URL: this.postQueue.queueUrl,
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
-        STAGE: props.stage
+        STAGE: props.stage,
+        PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
       }
       , retryAttempts: 0
     });

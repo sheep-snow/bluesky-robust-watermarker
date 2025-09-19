@@ -4,6 +4,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
+import { DatabaseStack } from './database-stack';
 import { ParamsResourceStack } from './params-resource-stack';
 import { ResourcePolicy } from './resource-policy';
 
@@ -11,7 +12,10 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
     stage: string;
     appName: string;
     paramsResourceStack: ParamsResourceStack;
-}export class VerifyWatermarkStack extends cdk.Stack {
+    databaseStack: DatabaseStack;
+}
+
+export class VerifyWatermarkStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: VerifyWatermarkStackProps) {
         super(scope, id, props);
 
@@ -53,7 +57,10 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
                                 'dynamodb:PutItem',
                                 'dynamodb:UpdateItem'
                             ],
-                            resources: [verificationResultsTable.tableArn]
+                            resources: [
+                                verificationResultsTable.tableArn,
+                                props.databaseStack.processingProgressTable.tableArn
+                            ]
                         })
                     ]
                 })
@@ -75,7 +82,7 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
             }),
             role: lambdaRole,
             ...ResourcePolicy.getLambdaDefaults(props.stage),
-            timeout: cdk.Duration.minutes(5),
+            timeout: cdk.Duration.minutes(2),
             memorySize: 3008,  // Increased memory for better performance
             logGroup: verifyWatermarkLogGroup,
             retryAttempts: 0,
@@ -87,7 +94,8 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
                 PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
                 PROVENANCE_PUBLIC_BUCKET_NAME: props.paramsResourceStack.provenancePublicBucket.bucketName,
                 STAGE: props.stage,
-                VERIFICATION_RESULTS_TABLE: verificationResultsTable.tableName
+                VERIFICATION_RESULTS_TABLE: verificationResultsTable.tableName,
+                PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
             }
         });
 
@@ -115,7 +123,8 @@ export interface VerifyWatermarkStackProps extends cdk.StackProps {
                 DOMAIN_NAME: process.env.DOMAIN_NAME || 'brw-example.app',
                 CLOUDFRONT_DOMAIN: cdk.Fn.importValue(`${props.appName}-dev-cloudfront-domain-name`),
                 STAGE: props.stage,
-                VERIFICATION_RESULTS_TABLE: verificationResultsTable.tableName
+                VERIFICATION_RESULTS_TABLE: verificationResultsTable.tableName,
+                PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
             }
         });
 
