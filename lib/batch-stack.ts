@@ -7,6 +7,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
 import * as stepfunctionsTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
+import { DatabaseStack } from './database-stack';
 import { MyPageStack } from './mypage-stack';
 import { ParamsResourceStack } from './params-resource-stack';
 import { ResourcePolicy } from './resource-policy';
@@ -16,6 +17,7 @@ export interface BatchStackProps extends cdk.StackProps {
   appName: string;
   paramsResourceStack: ParamsResourceStack;
   myPageStack: MyPageStack;
+  databaseStack: DatabaseStack;
 }
 
 export class BatchStack extends cdk.Stack {
@@ -71,6 +73,18 @@ export class BatchStack extends cdk.Stack {
             })
           ]
         }),
+        DynamoDBAccess: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'dynamodb:PutItem',
+                'dynamodb:UpdateItem'
+              ],
+              resources: [props.databaseStack.processingProgressTable.tableArn]
+            })
+          ]
+        }),
         CloudFrontAccess: new iam.PolicyDocument({
           statements: [
             new iam.PolicyStatement({
@@ -119,14 +133,15 @@ export class BatchStack extends cdk.Stack {
         file: 'Dockerfile'
       }),
       role: lambdaRole,
-      timeout: cdk.Duration.minutes(5), // Longer timeout for watermarking
+      timeout: cdk.Duration.minutes(3), // Longer timeout for watermarking
       memorySize: 3008, // More memory for image processing
       retryAttempts: 0,
       logGroup: embedWatermarkLogGroup,
       environment: {
         APP_NAME: props.appName,
         POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
-        STAGE: props.stage
+        STAGE: props.stage,
+        PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
       }
     });
 
@@ -144,7 +159,8 @@ export class BatchStack extends cdk.Stack {
       handler: 'handler',
       role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
-      timeout: cdk.Duration.minutes(5),
+      timeout: cdk.Duration.seconds(90),
+      memorySize: 1024,
       logGroup: postToBlueskyLogGroup,
       bundling: {
         externalModules: ['@aws-sdk/*'],
@@ -171,7 +187,7 @@ export class BatchStack extends cdk.Stack {
       handler: 'handler',
       role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
-      timeout: cdk.Duration.minutes(5),
+      memorySize: 1024,
       logGroup: generateProvenanceLogGroup,
       environment: {
         APP_NAME: props.appName,
@@ -196,7 +212,7 @@ export class BatchStack extends cdk.Stack {
       handler: 'handler',
       role: lambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
-      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
       logGroup: updateUserListLogGroup,
       environment: {
         APP_NAME: props.appName,
@@ -232,12 +248,12 @@ export class BatchStack extends cdk.Stack {
 
     // 画像数をチェック
     const checkImageCount = new stepfunctions.Choice(this, 'CheckImageCount');
-    
+
     // 異常な画像数の場合は終了
     const invalidImageCountEnd = new stepfunctions.Succeed(this, 'InvalidImageCountEnd', {
       comment: 'Invalid image count (0 or >4), ending workflow'
     });
-    
+
     // 並列透かし埋め込み処理
     const parallelWatermarkTasks = new stepfunctions.Map(this, 'ParallelWatermarkTasks', {
       itemsPath: '$.imageMetadata',
@@ -284,6 +300,15 @@ export class BatchStack extends cdk.Stack {
               resources: [`${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-arn`)}/*`]
             })
           ]
+        }),
+        DynamoDBTriggerAccess: new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: ['dynamodb:PutItem'],
+              resources: [props.databaseStack.processingProgressTable.tableArn]
+            })
+          ]
         })
       }
     });
@@ -302,11 +327,13 @@ export class BatchStack extends cdk.Stack {
       handler: 'handler',
       role: triggerLambdaRole,
       ...ResourcePolicy.getLambdaDefaults(props.stage),
-      timeout: cdk.Duration.minutes(5),
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
       logGroup: triggerLogGroup,
       environment: {
         APP_NAME: props.appName,
-        STATE_MACHINE_ARN: stateMachine.stateMachineArn
+        STATE_MACHINE_ARN: stateMachine.stateMachineArn,
+        PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
       }
     });
 

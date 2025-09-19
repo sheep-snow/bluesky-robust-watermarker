@@ -3,10 +3,12 @@ import * as cdk from 'aws-cdk-lib';
 import 'dotenv/config';
 import { AuthBackendStack } from '../lib/auth-backend-stack';
 import { BatchStack } from '../lib/batch-stack';
+import { DatabaseStack } from '../lib/database-stack';
 import { HomeStack } from '../lib/home-stack';
 import { LoginStack } from '../lib/login-stack';
 import { MyPageStack } from '../lib/mypage-stack';
 import { ParamsResourceStack } from '../lib/params-resource-stack';
+import { ProgressStack } from '../lib/progress-stack';
 import { SignupStack } from '../lib/signup-stack';
 import { VerifyStack } from '../lib/verify-stack';
 import { VerifyWatermarkStack } from '../lib/verify-watermark-stack';
@@ -26,6 +28,14 @@ const paramsResourceStack = new ParamsResourceStack(app, `${appName}-${stage}-pa
   stage,
   appName
 });
+
+// 1.5. データベーススタック
+const databaseStack = new DatabaseStack(app, `${appName}-${stage}-database`, {
+  env,
+  stage,
+  appName
+});
+databaseStack.addDependency(paramsResourceStack);
 
 // 2. 認証認可・公開バックエンド機能
 const authBackendStack = new AuthBackendStack(app, `${appName}-${stage}-auth-backend`, {
@@ -77,28 +87,45 @@ const verifyWatermarkStack = new VerifyWatermarkStack(app, `${appName}-${stage}-
   env,
   stage,
   appName,
-  paramsResourceStack
+  paramsResourceStack,
+  databaseStack
 });
 verifyWatermarkStack.addDependency(authBackendStack);
+verifyWatermarkStack.addDependency(databaseStack);
 
 // 6. マイページ機能（認証必須）
 const myPageStack = new MyPageStack(app, `${appName}-${stage}-mypage`, {
   env,
   stage,
   appName,
-  paramsResourceStack
+  paramsResourceStack,
+  databaseStack
 });
 myPageStack.addDependency(authBackendStack);
+myPageStack.addDependency(databaseStack);
 
-// 6. 投稿処理ワークフロー機能
+// 7. 投稿処理ワークフロー機能
 const batchStack = new BatchStack(app, `${appName}-${stage}-batch`, {
   env,
   stage,
   appName,
   paramsResourceStack,
-  myPageStack
+  myPageStack,
+  databaseStack
 });
 batchStack.addDependency(myPageStack);
+batchStack.addDependency(databaseStack);
+
+// 8. 進捗確認API
+const progressStack = new ProgressStack(app, `${appName}-${stage}-progress`, {
+  env,
+  stage,
+  appName,
+  paramsResourceStack,
+  databaseStack
+});
+progressStack.addDependency(authBackendStack);
+progressStack.addDependency(databaseStack);
 
 // スタック間の依存関係:
 // 1. paramsResourceStack (基盤)

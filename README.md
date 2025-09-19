@@ -141,16 +141,17 @@ npx cdk bootstrap # 初回のみ
 
 ```bash
 # stage=dev を指定, または省略
-npx cdk deploy --all --context stage=dev --require-approval never
+export AWS_PROFILE=${YOUR_AWS_PROFILE} && npx cdk deploy --all --context stage=dev --require-approval never
 # または個別にスタックを指定してデプロイ
-npx cdk deploy ${AppName}-dev-batch --context stage=dev --require-approval never
+export AWS_PROFILE=${YOUR_AWS_PROFILE} && npx cdk deploy ${AppName}-dev-batch --context stage=dev --require-approval never
+
 ```
 
 ### 本番環境
 
 ```bash
 # stage=prd を指定
-npx cdk deploy --all --context stage=prd --require-approval never
+export AWS_PROFILE=${YOUR_AWS_PROFILE} && npx cdk deploy --all --context stage=prd --require-approval never
 ```
 
 ## アクセスURL

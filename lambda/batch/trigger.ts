@@ -2,6 +2,30 @@
 import { SQSEvent } from 'aws-lambda';
 import { SFNClient, StartExecutionCommand } from '@aws-sdk/client-sfn';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
+
+const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
+
+const initializeProgress = async (taskId: string) => {
+  try {
+    const tableName = process.env.PROCESSING_PROGRESS_TABLE_NAME;
+    if (!tableName) return;
+    
+    await dynamodb.send(new PutItemCommand({
+      TableName: tableName,
+      Item: {
+        task_id: { S: taskId },
+        status: { S: 'starting' },
+        progress: { N: '0' },
+        message: { S: 'Processing started' },
+        updated_at: { S: Math.floor(Date.now() / 1000).toString() },
+        ttl: { N: (Math.floor(Date.now() / 1000) + 86400).toString() }
+      }
+    }));
+  } catch (e) {
+    console.error('Failed to initialize progress:', e);
+  }
+};
 
 const stepFunctionsClient = new SFNClient({ region: process.env.AWS_REGION });
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
@@ -33,6 +57,9 @@ export const handler = async (event: SQSEvent) => {
         console.log('Failed to load post data, proceeding without images:', error);
       }
 
+      // Initialize progress tracking
+      await initializeProgress(message.postId);
+      
       const executionInput = {
         postId: message.postId,
         userId: message.userId,
