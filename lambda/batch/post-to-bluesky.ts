@@ -135,7 +135,7 @@ export const handler = async (event: any) => {
 
   // Handle array input from Map task
   const inputData = Array.isArray(event) ? event[0] : event;
-  const { postId, bucket = process.env.POST_DATA_BUCKET } = inputData;
+  const { postId, bucket = process.env.POST_DATA_BUCKET, interactionSettings } = inputData;
   
   try {
     await updateProgress(postId, 'posting', 35, 'Starting Bluesky post');
@@ -152,7 +152,8 @@ export const handler = async (event: any) => {
       imageExtension: postData.imageExtension,
       imageFormat: postData.imageFormat,
       hasImage: !!postData.image,
-      userId: postData.userId
+      userId: postData.userId,
+      hasInteractionSettings: !!(interactionSettings || postData.interactionSettings)
     });
 
     // Use the userId from post.json, not from event
@@ -205,6 +206,39 @@ export const handler = async (event: any) => {
           val: label
         }))
       };
+    }
+
+    // Add interaction settings if specified (prioritize event input over post data)
+    const settings = interactionSettings || postData.interactionSettings;
+    if (settings) {
+      
+      // Quote settings
+      if (settings.quote === 'deny') {
+        postContent.tags = postContent.tags || [];
+        postContent.tags.push('!no-quote');
+      }
+      
+      // Reply settings
+      if (settings.reply === 'none') {
+        postContent.tags = postContent.tags || [];
+        postContent.tags.push('!no-reply');
+      } else if (settings.reply === 'everyone' && settings.replyOptions && settings.replyOptions.length > 0) {
+        // Add reply restrictions based on options
+        const replyGates = [];
+        if (settings.replyOptions.includes('mentioned')) {
+          replyGates.push({ $type: 'app.bsky.feed.postgate#mentionRule' });
+        }
+        if (settings.replyOptions.includes('following')) {
+          replyGates.push({ $type: 'app.bsky.feed.postgate#followingRule' });
+        }
+        if (settings.replyOptions.includes('followers')) {
+          replyGates.push({ $type: 'app.bsky.feed.postgate#listRule', list: 'followers' });
+        }
+        
+        if (replyGates.length > 0) {
+          postContent.replyGates = replyGates;
+        }
+      }
     }
 
     // Add images if they exist
@@ -261,11 +295,33 @@ export const handler = async (event: any) => {
 
     // Post to Bluesky
     await updateProgress(postId, 'posting', 60, 'Publishing to Bluesky');
+    
+    // Create the post record
     const blueskyResult = await agent.api.com.atproto.repo.createRecord({
       repo: agent.session.did,
       collection: 'app.bsky.feed.post',
       record: postContent
     });
+    
+    // If there are reply gates, create a separate postgate record
+    if (postContent.replyGates) {
+      try {
+        await agent.api.com.atproto.repo.createRecord({
+          repo: agent.session.did,
+          collection: 'app.bsky.feed.postgate',
+          record: {
+            $type: 'app.bsky.feed.postgate',
+            post: blueskyResult.data.uri,
+            detachedEmbeddingUris: [],
+            embeddingRules: postContent.replyGates,
+            createdAt: new Date().toISOString()
+          }
+        });
+        console.log('Postgate created for reply restrictions');
+      } catch (gateError) {
+        console.log('Failed to create postgate, continuing without reply restrictions:', gateError);
+      }
+    }
     console.log('Posted to Bluesky:', blueskyResult.data);
     
     await updateProgress(postId, 'posting', 70, 'Bluesky post completed');

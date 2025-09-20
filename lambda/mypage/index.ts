@@ -298,29 +298,32 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         
         <div id="content" class="hidden">
           <div class="flex justify-end mb-6 gap-4">
-            <a href="#" id="provenanceListLink" class="btn btn-soft hidden">View My Provenance List</a>
-            <button id="logoutBtn" onclick="logout()" class="btn btn-error">Logout</button>
+            <a href="#" id="provenanceListLink" class="btn btn-soft" disabled>来歴の一覧</a>
           </div>
           
           <div class="grid grid-cols-1 gap-8">
             <div class="card bg-base-100 shadow-xl">
               <div class="card-body">
-                <h2 class="card-title text-2xl mb-4">🔗 Bluesky 設定</h2>
-                <form id="settingsForm" class="space-y-4">
-                  <div class="form-control">
-                    <label class="label">
-                      <span class="label-text font-semibold">Bluesky User ID</span>
-                    </label>
-                    <input type="text" id="blueskyUserId" placeholder="alice.bsky.social or @alice.bsky.social" class="input input-bordered" />
+                <details class="collapse bg-base-100 border-base-300 border" id="blueskySettings">
+                  <summary class="collapse-title font-semibold text-2xl">🔗 Bluesky 設定</summary>
+                  <div class="collapse-content">
+                    <form id="settingsForm" class="space-y-4">
+                      <div class="form-control">
+                        <label class="label">
+                          <span class="label-text font-semibold">Bluesky User ID</span>
+                        </label>
+                        <input type="text" id="blueskyUserId" placeholder="alice.bsky.social or @alice.bsky.social" class="input input-bordered" />
+                      </div>
+                      <div class="form-control">
+                        <label class="label">
+                          <span class="label-text font-semibold">Bluesky App Password</span>
+                        </label>
+                        <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
+                      </div>
+                      <button type="submit" class="btn btn-primary w-full">保存</button>
+                    </form>
                   </div>
-                  <div class="form-control">
-                    <label class="label">
-                      <span class="label-text font-semibold">Bluesky App Password</span>
-                    </label>
-                    <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
-                  </div>
-                  <button type="submit" class="btn btn-primary w-full">保存</button>
-                </form>
+                </details>
               </div>
             </div>
             
@@ -350,6 +353,44 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                       </div>
                     </div>
                   </div>
+                  <details class="collapse bg-base-100 border-base-300 border">
+                    <summary class="collapse-title font-semibold">投稿への反応の設定</summary>
+                    <div class="collapse-content">
+                      <div class="space-y-4">
+                        <div>
+                          <h4 class="font-medium text-sm mb-2">引用の設定</h4>
+                          <label class="cursor-pointer flex items-center gap-3">
+                            <input type="checkbox" id="quoteSettings" class="toggle toggle-primary" checked />
+                            <span class="label-text" id="quoteLabel">許可</span>
+                          </label>
+                        </div>
+                        <div>
+                          <h4 class="font-medium text-sm mb-2">返信の設定</h4>
+                          <label class="cursor-pointer flex items-center gap-3">
+                            <input type="checkbox" id="replySettings" class="toggle toggle-primary" checked />
+                            <span class="label-text" id="replyLabel">全員</span>
+                          </label>
+                          <div id="replyOptions" class="mt-3 pl-6">
+                            <h5 class="font-medium text-xs mb-2 text-base-content/70">オプション</h5>
+                            <div class="space-y-2">
+                              <label class="cursor-pointer label justify-start gap-3">
+                                <input type="checkbox" id="replyMentioned" class="checkbox checkbox-sm reply-option" />
+                                <span class="label-text text-sm">メンションされたユーザー</span>
+                              </label>
+                              <label class="cursor-pointer label justify-start gap-3">
+                                <input type="checkbox" id="replyFollowing" class="checkbox checkbox-sm reply-option" />
+                                <span class="label-text text-sm">フォローしているユーザー</span>
+                              </label>
+                              <label class="cursor-pointer label justify-start gap-3">
+                                <input type="checkbox" id="replyFollowers" class="checkbox checkbox-sm reply-option" />
+                                <span class="label-text text-sm">フォロワー</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </details>
                   <details class="collapse bg-base-100 border-base-300 border">
                     <summary class="collapse-title font-semibold">ラベル</summary>
                     <div class="collapse-content">
@@ -570,6 +611,26 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               });
             });
             
+            // Handle quote settings toggle
+            document.getElementById('quoteSettings').addEventListener('change', function() {
+              const label = document.getElementById('quoteLabel');
+              label.textContent = this.checked ? '許可' : '不許可';
+            });
+            
+            // Handle reply settings toggle and visibility
+            document.getElementById('replySettings').addEventListener('change', function() {
+              const label = document.getElementById('replyLabel');
+              const replyOptions = document.getElementById('replyOptions');
+              
+              if (this.checked) {
+                label.textContent = '全員';
+                replyOptions.style.display = 'block';
+              } else {
+                label.textContent = '返信不可';
+                replyOptions.style.display = 'none';
+              }
+            });
+            
             // Settings form submission
             document.getElementById('settingsForm').addEventListener('submit', async (e) => {
               e.preventDefault();
@@ -625,6 +686,16 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               if (adultContentCheckboxes.length > 0) contentLabels.push(adultContentCheckboxes[0].value);
               if (document.getElementById('labelGraphicMedia').checked) contentLabels.push('graphic-media');
               
+              // Get interaction settings
+              const quoteSettings = document.getElementById('quoteSettings').checked ? 'allow' : 'deny';
+              const replySettings = document.getElementById('replySettings').checked ? 'everyone' : 'none';
+              const replyOptions = [];
+              if (replySettings === 'everyone') {
+                if (document.getElementById('replyMentioned').checked) replyOptions.push('mentioned');
+                if (document.getElementById('replyFollowing').checked) replyOptions.push('following');
+                if (document.getElementById('replyFollowers').checked) replyOptions.push('followers');
+              }
+              
               // Process multiple images
               const images = [];
               const imageRows = document.querySelectorAll('.image-row');
@@ -669,7 +740,12 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               const postData = {
                 text: text,
                 images: images,
-                contentLabels: contentLabels
+                contentLabels: contentLabels,
+                interactionSettings: {
+                  quote: quoteSettings,
+                  reply: replySettings,
+                  replyOptions: replyOptions
+                }
               };
               
               const response = await fetch('/mypage/post', {
@@ -722,16 +798,24 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                   document.getElementById('lastValidated').textContent = new Date(userInfo.validatedAt).toLocaleString();
                   document.getElementById('userInfo').classList.remove('hidden');
                   
-                  // Show provenance list link if user has provenance page ID
+                  // Enable provenance list link if user has provenance page ID
                   if (userInfo.provenancePageId) {
                     const provenanceLink = document.getElementById('provenanceListLink');
                     provenanceLink.href = '/users/' + userInfo.provenancePageId + '.html';
-                    provenanceLink.classList.remove('hidden');
+                    provenanceLink.removeAttribute('disabled');
                   }
+                } else {
+                  // No user info found, expand Bluesky settings
+                  document.getElementById('blueskySettings').open = true;
                 }
+              } else {
+                // Failed to get user info, expand Bluesky settings
+                document.getElementById('blueskySettings').open = true;
               }
             } catch (error) {
               console.log('No existing user info found');
+              // No user info found, expand Bluesky settings
+              document.getElementById('blueskySettings').open = true;
             }
           }
           
@@ -979,6 +1063,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             userId,
             text: body.text || '',
             contentLabels: body.contentLabels || [],
+            interactionSettings: body.interactionSettings || {
+              quote: 'allow',
+              reply: 'everyone',
+              replyOptions: []
+            },
             createdAt: new Date().toISOString(),
             imageMetadata: imageMetadata
           };

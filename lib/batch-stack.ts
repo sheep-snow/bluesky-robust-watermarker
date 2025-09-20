@@ -264,15 +264,29 @@ export class BatchStack extends cdk.Stack {
         'bucket.$': '$$.Execution.Input.bucket',
         'imageIndex.$': '$$.Map.Item.Value.index',
         'imageExtension.$': '$$.Map.Item.Value.extension'
-      }
+      },
+      resultPath: '$.watermarkResults'
     });
     parallelWatermarkTasks.iterator(embedWatermarkTask);
+    
+    // Pass execution input to PostToBlueskyTask
+    const passExecutionInput = new stepfunctions.Pass(this, 'PassExecutionInput', {
+      parameters: {
+        'postId.$': '$$.Execution.Input.postId',
+        'userId.$': '$$.Execution.Input.userId',
+        'bucket.$': '$$.Execution.Input.bucket',
+        'timestamp.$': '$$.Execution.Input.timestamp',
+        'interactionSettings.$': '$$.Execution.Input.interactionSettings',
+        'watermarkResults.$': '$.watermarkResults'
+      }
+    });
 
     // ワークフロー定義
     const definition = checkImageCount
       .when(
         stepfunctions.Condition.isPresent('$.imageMetadata[0]'),
         parallelWatermarkTasks
+          .next(passExecutionInput)
           .next(postToBlueskyTask)
           .next(generateProvenanceTask)
           .next(updateUserListTask)
