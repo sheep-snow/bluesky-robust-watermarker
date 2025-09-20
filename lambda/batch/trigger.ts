@@ -38,8 +38,9 @@ export const handler = async (event: SQSEvent) => {
       const message = JSON.parse(record.body);
       console.log('Processing message:', message);
 
-      // Get post data to check for images
+      // Get post data to check for images and interaction settings
       let imageMetadata = [];
+      let interactionSettings = null;
       try {
         const postCommand = new GetObjectCommand({
           Bucket: message.bucket,
@@ -53,6 +54,11 @@ export const handler = async (event: SQSEvent) => {
         if (postData.imageMetadata && postData.imageMetadata.length > 0) {
           imageMetadata = postData.imageMetadata;
         }
+        
+        if (postData.interactionSettings) {
+          interactionSettings = postData.interactionSettings;
+          console.log('Interaction settings loaded:', interactionSettings);
+        }
       } catch (error) {
         console.log('Failed to load post data, proceeding without images:', error);
       }
@@ -65,7 +71,8 @@ export const handler = async (event: SQSEvent) => {
         userId: message.userId,
         bucket: message.bucket,
         timestamp: message.timestamp,
-        imageMetadata: imageMetadata
+        imageMetadata: imageMetadata,
+        interactionSettings: interactionSettings
       };
 
       const command = new StartExecutionCommand({

@@ -2,7 +2,7 @@ import { DecryptCommand, KMSClient } from '@aws-sdk/client-kms';
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SSMClient } from '@aws-sdk/client-ssm';
-const { AtpAgent } = require('@atproto/api');
+const { AtpAgent, AtUri } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
 const sharp = require('sharp');
 
@@ -135,7 +135,7 @@ export const handler = async (event: any) => {
 
   // Handle array input from Map task
   const inputData = Array.isArray(event) ? event[0] : event;
-  const { postId, bucket = process.env.POST_DATA_BUCKET } = inputData;
+  const { postId, bucket = process.env.POST_DATA_BUCKET, interactionSettings } = inputData;
   
   try {
     await updateProgress(postId, 'posting', 35, 'Starting Bluesky post');
@@ -152,7 +152,8 @@ export const handler = async (event: any) => {
       imageExtension: postData.imageExtension,
       imageFormat: postData.imageFormat,
       hasImage: !!postData.image,
-      userId: postData.userId
+      userId: postData.userId,
+      hasInteractionSettings: !!(interactionSettings || postData.interactionSettings)
     });
 
     // Use the userId from post.json, not from event
@@ -206,6 +207,10 @@ export const handler = async (event: any) => {
         }))
       };
     }
+
+    // Store interaction settings for later use
+    const settings = interactionSettings || postData.interactionSettings;
+    console.log('Interaction settings:', settings);
 
     // Add images if they exist
     if (postData.imageMetadata && postData.imageMetadata.length > 0) {
@@ -261,12 +266,76 @@ export const handler = async (event: any) => {
 
     // Post to Bluesky
     await updateProgress(postId, 'posting', 60, 'Publishing to Bluesky');
+    
+    // Create the post record
     const blueskyResult = await agent.api.com.atproto.repo.createRecord({
       repo: agent.session.did,
       collection: 'app.bsky.feed.post',
       record: postContent
     });
+    
+    // Apply interaction settings after post creation
+    if (settings) {
+      console.log('Applying interaction settings:', settings);
+      
+      // Extract rkey from post URI for threadgate
+      const postUri = blueskyResult.data.uri;
+      const rkey = postUri.split('/').pop(); // Extract rkey from URI
+      console.log('Post URI:', postUri, 'Extracted rkey:', rkey);
+      
+      // Create threadgate for reply restrictions
+      if (settings.reply === 'none') {
+        try {
+          const threadgateResult = await agent.api.com.atproto.repo.createRecord({
+            repo: agent.session.did,
+            collection: 'app.bsky.feed.threadgate',
+            rkey: rkey, // Use same rkey as post
+            record: {
+              $type: 'app.bsky.feed.threadgate',
+              post: postUri,
+              allow: [], // Empty array = nobody can reply
+              createdAt: new Date().toISOString()
+            }
+          });
+          console.log('Threadgate created - replies disabled:', threadgateResult.data);
+        } catch (gateError) {
+          console.log('Failed to create threadgate for reply restriction:', gateError);
+          console.log('Error details:', JSON.stringify(gateError, null, 2));
+        }
+      } else if (settings.reply === 'everyone' && settings.replyOptions && settings.replyOptions.length > 0) {
+        try {
+          const allowRules = [];
+          if (settings.replyOptions.includes('mentioned')) {
+            allowRules.push({ $type: 'app.bsky.feed.threadgate#mentionRule' });
+          }
+          if (settings.replyOptions.includes('following')) {
+            allowRules.push({ $type: 'app.bsky.feed.threadgate#followingRule' });
+          }
+          if (settings.replyOptions.includes('followers')) {
+            allowRules.push({ $type: 'app.bsky.feed.threadgate#followerRule' });
+          }
+          
+          const threadgateResult = await agent.api.com.atproto.repo.createRecord({
+            repo: agent.session.did,
+            collection: 'app.bsky.feed.threadgate',
+            rkey: rkey, // Use same rkey as post
+            record: {
+              $type: 'app.bsky.feed.threadgate',
+              post: postUri,
+              allow: allowRules,
+              createdAt: new Date().toISOString()
+            }
+          });
+          console.log('Threadgate created with reply restrictions:', threadgateResult.data);
+        } catch (gateError) {
+          console.log('Failed to create threadgate with restrictions:', gateError);
+        }
+      }
+      
+
+    }
     console.log('Posted to Bluesky:', blueskyResult.data);
+    console.log('Post URI for gates:', blueskyResult.data.uri);
     
     await updateProgress(postId, 'posting', 70, 'Bluesky post completed');
 
