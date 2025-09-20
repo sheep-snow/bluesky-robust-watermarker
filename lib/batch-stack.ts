@@ -8,7 +8,7 @@ import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
 import * as stepfunctionsTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Construct } from 'constructs';
 import { DatabaseStack } from './database-stack';
-import { MyPageStack } from './mypage-stack';
+
 import { ParamsResourceStack } from './params-resource-stack';
 import { ResourcePolicy } from './resource-policy';
 
@@ -16,7 +16,6 @@ export interface BatchStackProps extends cdk.StackProps {
   stage: string;
   appName: string;
   paramsResourceStack: ParamsResourceStack;
-  myPageStack: MyPageStack;
   databaseStack: DatabaseStack;
 }
 
@@ -42,8 +41,7 @@ export class BatchStack extends cdk.Stack {
               ],
               resources: [
                 `${props.paramsResourceStack.userInfoBucket.bucketArn}/*`,
-                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`)}/*`,
-                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`)}/*`,
+                `${props.paramsResourceStack.provenanceInfoBucket.bucketArn}/*`,
                 `${props.paramsResourceStack.provenancePublicBucket.bucketArn}/*`
               ]
             }),
@@ -54,8 +52,7 @@ export class BatchStack extends cdk.Stack {
               ],
               resources: [
                 props.paramsResourceStack.userInfoBucket.bucketArn,
-                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`)}`,
-                `arn:aws:s3:::${cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`)}`,
+                props.paramsResourceStack.provenanceInfoBucket.bucketArn,
                 props.paramsResourceStack.provenancePublicBucket.bucketArn
               ]
             })
@@ -139,7 +136,7 @@ export class BatchStack extends cdk.Stack {
       logGroup: embedWatermarkLogGroup,
       environment: {
         APP_NAME: props.appName,
-        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
+        POST_DATA_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
         STAGE: props.stage,
         PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
       }
@@ -169,7 +166,7 @@ export class BatchStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
-        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
+        POST_DATA_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
         STAGE: props.stage
       }
     });
@@ -192,8 +189,8 @@ export class BatchStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
-        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
-        PROVENANCE_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`),
+        POST_DATA_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
+        PROVENANCE_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
         STAGE: props.stage
       }
@@ -217,10 +214,9 @@ export class BatchStack extends cdk.Stack {
       environment: {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
-        POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
-        PROVENANCE_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`),
+        POST_DATA_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
+        PROVENANCE_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
-        CLOUDFRONT_DISTRIBUTION_ID: cdk.Fn.importValue(`${props.appName}-${props.stage}-distribution-id`),
         STAGE: props.stage
       }
     });
@@ -311,7 +307,7 @@ export class BatchStack extends cdk.Stack {
             new iam.PolicyStatement({
               effect: iam.Effect.ALLOW,
               actions: ['s3:GetObject'],
-              resources: [`${cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-arn`)}/*`]
+              resources: [`${props.paramsResourceStack.provenanceInfoBucket.bucketArn}/*`]
             })
           ]
         }),
@@ -354,12 +350,24 @@ export class BatchStack extends cdk.Stack {
     // Step Functions実行権限
     stateMachine.grantStartExecution(triggerFunction);
 
-    // SQSイベントソース
-    const postQueueArn = cdk.Fn.importValue(`${props.appName}-${props.stage}-post-queue-arn`);
-    const postQueue = sqs.Queue.fromQueueArn(this, 'ImportedPostQueue', postQueueArn);
+    // SQS Queue作成
+    const postQueue = new sqs.Queue(this, 'PostQueue', {
+      queueName: `${props.appName}-${props.stage}-post-queue`,
+      visibilityTimeout: cdk.Duration.minutes(5)
+    });
     triggerFunction.addEventSource(new eventsources.SqsEventSource(postQueue, {
       batchSize: 1
     }));
+
+    // 出力
+    new cdk.CfnOutput(this, 'PostQueueUrl', {
+      value: postQueue.queueUrl,
+      exportName: `${props.appName}-${props.stage}-post-queue-url`
+    });
+    new cdk.CfnOutput(this, 'PostQueueArn', {
+      value: postQueue.queueArn,
+      exportName: `${props.appName}-${props.stage}-post-queue-arn`
+    });
 
     // 出力
     new cdk.CfnOutput(this, 'PostProcessingWorkflowArn', {

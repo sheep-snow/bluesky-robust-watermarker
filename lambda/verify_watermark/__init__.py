@@ -1,1 +1,0 @@
-# Verify watermark module

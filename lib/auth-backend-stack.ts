@@ -21,7 +21,6 @@ export class AuthBackendStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly certificate: acm.Certificate;
-  public readonly distribution: cloudfront.Distribution;
   public readonly api: apigateway.RestApi;
 
   constructor(scope: Construct, id: string, props: AuthBackendStackProps) {
@@ -126,160 +125,9 @@ export class AuthBackendStack extends cdk.Stack {
 
 
 
-    // S3用のキャッシュポリシー（静的コンテンツ用）
-    const s3CachePolicy = new cloudfront.CachePolicy(this, 'S3CachePolicy', {
-      cachePolicyName: `${props.appName}-s3-cache-policy`,
-      comment: 'Cache policy for S3 static content',
-      defaultTtl: cdk.Duration.hours(24),
-      maxTtl: cdk.Duration.days(365),
-      minTtl: cdk.Duration.seconds(1),
-      headerBehavior: cloudfront.CacheHeaderBehavior.none(),
-      queryStringBehavior: cloudfront.CacheQueryStringBehavior.none(),
-      cookieBehavior: cloudfront.CacheCookieBehavior.none()
-    });
 
-    // S3バケット（静的ファイル用）
-    const staticFilesBucket = new s3.Bucket(this, 'StaticFilesBucket', {
-      bucketName: `${props.appName}-${props.stage}-static-files`,
-      publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true
-    });
 
-    // 静的ファイル（favicon.ico、CSS）をS3にデプロイ
-    new s3deploy.BucketDeployment(this, 'DeployStaticFiles', {
-      sources: [
-        s3deploy.Source.asset('./static', {
-          exclude: ['tailwind.css'] // ビルド前のファイルは除外
-        })
-      ],
-      destinationBucket: staticFilesBucket
-    });
 
-    // CloudFront Distribution (API Gateway + S3 Origins)
-    const apiOrigin = new origins.RestApiOrigin(this.api);
-    const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(staticFilesBucket);
-
-    this.distribution = new cloudfront.Distribution(this, 'Distribution', {
-      defaultBehavior: {
-        origin: apiOrigin,
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-        cachePolicy: cachePolicy,
-        originRequestPolicy: originRequestPolicy
-      },
-      additionalBehaviors: {
-        '/mypage/*': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: cachePolicy,
-          originRequestPolicy: originRequestPolicy
-        },
-        '/signup': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: cachePolicy,
-          originRequestPolicy: originRequestPolicy
-        },
-        '/login': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: cachePolicy,
-          originRequestPolicy: originRequestPolicy
-        },
-        '/callback': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: cachePolicy,
-          originRequestPolicy: originRequestPolicy
-        },
-        // Public watermark verification (no auth required)
-        '/verify-watermark': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: cachePolicy,
-          originRequestPolicy: originRequestPolicy
-        },
-        // Favicon (S3経由)
-        'favicon.ico': {
-          origin: s3Origin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: s3CachePolicy
-        },
-        // CSSファイル (S3経由)
-        '*.css': {
-          origin: s3Origin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: s3CachePolicy
-        },
-        // User list pages (S3オリジン)
-        'users/*': {
-          origin: new origins.S3Origin(props.paramsResourceStack.provenancePublicBucket),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: s3CachePolicy
-        },
-        // Provenance pages (S3オリジン) - 投稿IDのパスパターン
-        'provenance/*': {
-          origin: new origins.S3Origin(props.paramsResourceStack.provenancePublicBucket),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
-          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
-          cachePolicy: s3CachePolicy,
-          // ディレクトリパスでのアクセス時にindex.htmlを自動追加するFunction
-          functionAssociations: [{
-            function: new cloudfront.Function(this, 'IndexRewriteFunction', {
-              functionName: `${props.appName}-${props.stage}-index-rewrite`,
-              code: cloudfront.FunctionCode.fromInline(`
-function handler(event) {
-    var request = event.request;
-    var uri = request.uri;
-    
-    // URIが/で終わる場合、index.htmlを追加
-    if (uri.endsWith('/')) {
-        request.uri += 'index.html';
-    }
-    // URIがディレクトリ名のみの場合（拡張子なし）、/index.htmlを追加  
-    else if (!uri.includes('.')) {
-        request.uri += '/index.html';
-    }
-    
-    return request;
-}
-              `),
-              comment: 'Rewrite directory requests to index.html'
-            }),
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
-          }]
-        }
-      },
-      domainNames: [props.paramsResourceStack.domainName],
-      certificate: this.certificate
-    });
-
-    // Route53 A record for CloudFront distribution
-    new route53.ARecord(this, 'AliasRecord', {
-      zone: props.paramsResourceStack.hostedZone,
-      recordName: props.paramsResourceStack.domainName,
-      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(this.distribution))
-    });
 
     // デプロイメントとステージは ApiDeploymentStack で統一管理
     // （循環依分を回避するため）
@@ -302,11 +150,6 @@ function handler(event) {
       exportName: `${props.appName}-${props.stage}-api-gateway-url`
     });
 
-    new cdk.CfnOutput(this, 'CloudFrontDomainName', {
-      value: this.distribution.distributionDomainName,
-      exportName: `${props.appName}-${props.stage}-cloudfront-domain-name`
-    });
-
     new cdk.CfnOutput(this, 'ApiGatewayId', {
       value: this.api.restApiId,
       exportName: `${props.appName}-${props.stage}-api-gateway-id`
@@ -315,11 +158,6 @@ function handler(event) {
     new cdk.CfnOutput(this, 'ApiGatewayRootResourceId', {
       value: this.api.restApiRootResourceId,
       exportName: `${props.appName}-${props.stage}-api-gateway-root-resource-id`
-    });
-
-    new cdk.CfnOutput(this, 'DistributionId', {
-      value: this.distribution.distributionId,
-      exportName: `${props.appName}-${props.stage}-distribution-id`
     });
 
     // Route53 A Record (temporarily disabled for initial deployment)

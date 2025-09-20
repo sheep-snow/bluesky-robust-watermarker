@@ -1,0 +1,366 @@
+---
+// MyPage - Astro frontend page
+---
+
+<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+    <title id="page-title">Loading - My Page</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body class="min-h-screen flex flex-col">
+    <div class="navbar bg-base-100 shadow-lg">
+        <div class="navbar-start">
+            <a href="/" class="btn btn-ghost text-xl" id="app-name-nav">Loading...</a>
+        </div>
+        <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1">
+                <li><a href="/">Home</a></li>
+                <li><a href="/signup">Sign Up</a></li>
+                <li><a href="/login">Login</a></li>
+                <li><a href="/mypage" class="active">My Page</a></li>
+                <li><a href="/verify-watermark">Verify</a></li>
+            </ul>
+        </div>
+        <div class="navbar-end">
+            <button onclick="logout()" class="btn btn-error btn-sm hidden" id="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <main class="flex-1 container mx-auto px-4 py-8">
+        <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+            <div class="hero-content text-center py-12">
+                <div class="max-w-md">
+                    <h1 class="mb-5 text-4xl font-bold">📄 My Page</h1>
+                    <p class="mb-5 text-lg">Blueskyのアプリパスワードを登録し、作品を投稿する</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="authStatus" class="alert alert-info">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span>Checking authentication...</span>
+        </div>
+        
+        <div id="content" class="hidden">
+            <div class="flex justify-end mb-6 gap-4">
+                <a href="#" id="provenanceListLink" class="btn btn-soft" disabled>来歴の一覧</a>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-8">
+                <div class="card bg-base-100 shadow-xl">
+                    <div class="card-body">
+                        <details class="collapse bg-base-100 border-base-300 border" id="blueskySettings">
+                            <summary class="collapse-title font-semibold text-2xl">🔗 Bluesky 設定</summary>
+                            <div class="collapse-content">
+                                <form id="settingsForm" class="space-y-4">
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text font-semibold">Bluesky User ID</span>
+                                        </label>
+                                        <input type="text" id="blueskyUserId" placeholder="alice.bsky.social or @alice.bsky.social" class="input input-bordered" />
+                                    </div>
+                                    <div class="form-control">
+                                        <label class="label">
+                                            <span class="label-text font-semibold">Bluesky App Password</span>
+                                        </label>
+                                        <input type="password" id="blueskyAppPassword" placeholder="abcd-efgh-ijkl-mnop" class="input input-bordered" />
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-full">保存</button>
+                                </form>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-xl">
+                    <div class="card-body">
+                        <h2 class="card-title text-2xl mb-4">✍️ 作品を投稿</h2>
+                        <form id="postForm" class="space-y-4">
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text font-semibold">投稿文</span>
+                                    <span class="label-text-alt">最大300文字</span>
+                                </label>
+                                <textarea id="postText" rows="4" placeholder="投稿文..." class="textarea textarea-bordered" maxlength="300"></textarea>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text font-semibold">画像 (最大4枚)</span>
+                                    <div class="flex gap-2">
+                                        <button type="button" id="addImageBtn" class="btn btn-sm btn-outline">+ 追加</button>
+                                        <button type="button" id="removeImageBtn" class="btn btn-sm btn-outline">- 削除</button>
+                                    </div>
+                                </label>
+                                <div id="imageInputs" class="space-y-4">
+                                    <div class="grid grid-cols-2 gap-4 image-row" data-index="1">
+                                        <input type="file" id="postImage1" accept="image/*" class="file-input file-input-bordered" />
+                                        <textarea id="altText1" rows="2" placeholder="画像1の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" id="postSubmitBtn" class="btn btn-accent w-full" disabled>投稿</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="userInfo" class="card bg-base-100 shadow-xl mt-8 hidden">
+                <div class="card-body">
+                    <h3 class="card-title text-xl mb-4">📊 Current Settings</h3>
+                    <div class="stats stats-vertical lg:stats-horizontal shadow">
+                        <div class="stat">
+                            <div class="stat-title">Bluesky User ID</div>
+                            <div class="stat-value text-lg" id="currentUserId"></div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Last Updated</div>
+                            <div class="stat-value text-lg" id="lastUpdated"></div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Last Validated</div>
+                            <div class="stat-value text-lg" id="lastValidated"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Load app name from API
+        fetch('/api/mypage')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('page-title').textContent = `${data.title}`;
+                document.getElementById('app-name-nav').textContent = data.title.split(' - ')[0];
+            })
+            .catch(() => {
+                document.getElementById('page-title').textContent = 'App - My Page';
+                document.getElementById('app-name-nav').textContent = 'App';
+            });
+        
+        const accessToken = localStorage.getItem('access_token');
+        const idToken = localStorage.getItem('id_token');
+        
+        if (!accessToken || !idToken) {
+            document.getElementById('authStatus').innerHTML = 
+                '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><span>まだログインしていません。 <a href="/signup" class="link">サインアップしてください。</a> or <a href="/login" class="link">login</a>.</span>';
+            document.getElementById('authStatus').className = 'alert alert-warning';
+        } else {
+            document.getElementById('authStatus').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            
+            loadUserInfo();
+            initializeImageInputs();
+            validateSubmitButton();
+            
+            // Settings form submission
+            document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const data = {
+                    blueskyUserId: document.getElementById('blueskyUserId').value,
+                    blueskyAppPassword: document.getElementById('blueskyAppPassword').value
+                };
+                
+                try {
+                    const response = await fetch('/api/mypage', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + accessToken
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (response.ok) {
+                        alert('Settings saved and validated successfully!');
+                        loadUserInfo();
+                    } else {
+                        const errorData = await response.json();
+                        alert('設定の保存に失敗しました: ' + (errorData.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    alert('Network error: ' + error.message);
+                }
+            });
+            
+            // Post form submission
+            document.getElementById('postForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const text = document.getElementById('postText').value;
+                const images = [];
+                const imageRows = document.querySelectorAll('.image-row');
+                
+                for (let i = 0; i < imageRows.length; i++) {
+                    const row = imageRows[i];
+                    const index = row.dataset.index;
+                    const imageFile = document.getElementById('postImage' + index).files[0];
+                    const altText = document.getElementById('altText' + index).value;
+                    
+                    if (imageFile) {
+                        if (imageFile.size > 3 * 1024 * 1024) {
+                            alert('画像' + index + 'のファイルサイズは3MB以下にしてください。');
+                            return;
+                        }
+                        
+                        const reader = new FileReader();
+                        const imageBase64 = await new Promise((resolve) => {
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(imageFile);
+                        });
+                        
+                        images.push({
+                            image: imageBase64,
+                            altText: altText
+                        });
+                    }
+                }
+                
+                const postData = {
+                    text: text,
+                    images: images,
+                    contentLabels: [],
+                    interactionSettings: {
+                        reply: 'everyone',
+                        replyOptions: []
+                    }
+                };
+                
+                const response = await fetch('/api/mypage/post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + accessToken
+                    },
+                    body: JSON.stringify(postData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('投稿が完了しました！Post ID: ' + result.postId);
+                    document.getElementById('postForm').reset();
+                } else {
+                    const errorData = await response.json();
+                    alert('投稿に失敗しました: ' + (errorData.error || 'Unknown error'));
+                }
+            });
+        }
+        
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/mypage/info', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + accessToken
+                    }
+                });
+                
+                if (response.ok) {
+                    const userInfo = await response.json();
+                    if (userInfo.blueskyUserId) {
+                        document.getElementById('blueskyUserId').value = userInfo.blueskyUserId;
+                        document.getElementById('currentUserId').textContent = userInfo.blueskyUserId;
+                        document.getElementById('lastUpdated').textContent = new Date(userInfo.updatedAt).toLocaleString();
+                        document.getElementById('lastValidated').textContent = new Date(userInfo.validatedAt).toLocaleString();
+                        document.getElementById('userInfo').classList.remove('hidden');
+                        
+                        if (userInfo.provenancePageId) {
+                            const provenanceLink = document.getElementById('provenanceListLink');
+                            provenanceLink.href = '/users/' + userInfo.provenancePageId + '.html';
+                            provenanceLink.removeAttribute('disabled');
+                        }
+                    } else {
+                        document.getElementById('blueskySettings').open = true;
+                    }
+                } else {
+                    document.getElementById('blueskySettings').open = true;
+                }
+            } catch (error) {
+                console.log('No existing user info found');
+                document.getElementById('blueskySettings').open = true;
+            }
+        }
+        
+        function initializeImageInputs() {
+            const addBtn = document.getElementById('addImageBtn');
+            const removeBtn = document.getElementById('removeImageBtn');
+            
+            addBtn.addEventListener('click', () => {
+                const container = document.getElementById('imageInputs');
+                const currentRows = container.querySelectorAll('.image-row').length;
+                
+                if (currentRows < 4) {
+                    const newIndex = currentRows + 1;
+                    const newRow = document.createElement('div');
+                    newRow.className = 'grid grid-cols-2 gap-4 image-row';
+                    newRow.dataset.index = newIndex;
+                    newRow.innerHTML = 
+                        '<input type="file" id="postImage' + newIndex + '" accept="image/*" class="file-input file-input-bordered" />' +
+                        '<textarea id="altText' + newIndex + '" rows="2" placeholder="画像' + newIndex + 'の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>';
+                    
+                    newRow.querySelector('input[type="file"]').addEventListener('change', validateSubmitButton);
+                    container.appendChild(newRow);
+                }
+                
+                updateImageButtons();
+            });
+            
+            removeBtn.addEventListener('click', () => {
+                const container = document.getElementById('imageInputs');
+                const rows = container.querySelectorAll('.image-row');
+                
+                if (rows.length > 1) {
+                    rows[rows.length - 1].remove();
+                }
+                
+                updateImageButtons();
+                validateSubmitButton();
+            });
+            
+            document.getElementById('postImage1').addEventListener('change', validateSubmitButton);
+            updateImageButtons();
+        }
+        
+        function validateSubmitButton() {
+            const imageRows = document.querySelectorAll('.image-row');
+            const submitBtn = document.getElementById('postSubmitBtn');
+            let hasImage = false;
+            
+            for (const row of imageRows) {
+                const index = row.dataset.index;
+                const fileInput = document.getElementById('postImage' + index);
+                if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                    hasImage = true;
+                    break;
+                }
+            }
+            
+            submitBtn.disabled = !hasImage;
+        }
+        
+        function updateImageButtons() {
+            const container = document.getElementById('imageInputs');
+            const currentRows = container.querySelectorAll('.image-row').length;
+            const addBtn = document.getElementById('addImageBtn');
+            const removeBtn = document.getElementById('removeImageBtn');
+            
+            addBtn.disabled = currentRows >= 4;
+            removeBtn.disabled = currentRows <= 1;
+        }
+        
+        function logout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('id_token');
+            localStorage.removeItem('refresh_token');
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

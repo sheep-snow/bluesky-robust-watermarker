@@ -1,0 +1,81 @@
+---
+import '../styles/global.css';
+---
+
+<html lang="ja" data-theme="cupcake">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width" />
+    <title id="page-title">Loading...</title>
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <nav class="navbar bg-base-100 shadow-lg">
+      <div class="navbar-start">
+        <a href="/" class="btn btn-ghost text-xl" id="app-name-nav">Loading...</a>
+      </div>
+      <div class="navbar-center hidden lg:flex">
+        <ul class="menu menu-horizontal px-1">
+          <li><a href="/" class="active">Home</a></li>
+          <li><a href="/signup">Sign Up</a></li>
+          <li><a href="/login">Login</a></li>
+          <li><a href="/mypage">My Page</a></li>
+          <li><a href="/verify-watermark">Verify</a></li>
+        </ul>
+      </div>
+    </nav>
+    
+    <main class="flex-1 container mx-auto px-4 py-8">
+      <div id="app">Loading...</div>
+    </main>
+    
+    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+      <aside>
+        <p id="footer-text">© 2025 Loading...</p>
+      </aside>
+    </footer>
+    
+    <script>
+      // API呼び出しでデータを取得
+      fetch('/api/')
+        .then(response => response.json())
+        .then(data => {
+          // Update page title and navigation
+          document.getElementById('page-title').textContent = `${data.appName} - Image Provenance Service`;
+          document.getElementById('app-name-nav').textContent = data.appName;
+          document.getElementById('footer-text').textContent = `© 2025 ${data.appName} - Image Provenance Service`;
+          
+          document.getElementById('app').innerHTML = `
+            <div class="hero min-h-96 bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+              <div class="hero-content text-center">
+                <div class="max-w-md">
+                  <h1 class="mb-5 text-5xl font-bold">${data.appName}</h1>
+                  <p class="mb-5 text-xl">${data.description}</p>
+                  <div class="flex gap-4 justify-center items-center">
+                    <a href="${data.links.signup}" class="btn btn-accent btn-lg">Get Started</a>
+                    <a href="${data.links.login}" class="btn btn-outline btn-lg">Login</a>
+                    <a href="${data.links.verify}" class="btn btn-outline btn-lg">Verify</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card bg-base-100 shadow-xl mb-8">
+              <div class="card-body">
+                <h2 class="card-title text-2xl mb-4">What is ${data.appName}?</h2>
+                <ul class="list-disc list-inside text-left mb-5">
+                  ${data.features.map(feature => `<li>${feature}</li>`).join('')}
+                </ul>
+                <a href="${data.links.manual}" class="btn btn-primary btn-md">User Manual</a>
+              </div>
+            </div>
+          `;
+        })
+        .catch(error => {
+          document.getElementById('page-title').textContent = 'Error - Image Provenance Service';
+          document.getElementById('app-name-nav').textContent = 'App';
+          document.getElementById('footer-text').textContent = '© 2025 Image Provenance Service';
+          document.getElementById('app').innerHTML = '<div class="alert alert-error"><span>Error loading data</span></div>';
+        });
+    </script>
+  </body>
+</html>

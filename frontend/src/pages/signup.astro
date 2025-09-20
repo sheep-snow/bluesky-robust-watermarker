@@ -1,0 +1,97 @@
+---
+import '../styles/global.css';
+---
+
+<html lang="ja" data-theme="cupcake">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width" />
+    <title id="page-title">Loading - Sign Up</title>
+  </head>
+  <body class="min-h-screen flex flex-col">
+    <nav class="navbar bg-base-100 shadow-lg">
+      <div class="navbar-start">
+        <a href="/" class="btn btn-ghost text-xl" id="app-name-nav">Loading...</a>
+      </div>
+      <div class="navbar-center hidden lg:flex">
+        <ul class="menu menu-horizontal px-1">
+          <li><a href="/">Home</a></li>
+          <li><a href="/signup" class="active">Sign Up</a></li>
+          <li><a href="/login">Login</a></li>
+          <li><a href="/mypage">My Page</a></li>
+          <li><a href="/verify-watermark">Verify</a></li>
+        </ul>
+      </div>
+    </nav>
+    
+    <main class="flex-1 container mx-auto px-4 py-8">
+      <div id="app">Loading...</div>
+    </main>
+    
+    <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+      <aside>
+        <p id="footer-text">© 2025 Loading...</p>
+      </aside>
+    </footer>
+    
+    <script>
+      // Check if already authenticated
+      function checkAuthAndRedirect() {
+        const accessToken = localStorage.getItem('access_token');
+        const idToken = localStorage.getItem('id_token');
+        if (accessToken && idToken) {
+          window.location.href = '/mypage';
+          return;
+        }
+      }
+      
+      // Load signup data from API
+      fetch('/api/signup')
+        .then(response => response.json())
+        .then(data => {
+          // Update page elements with app name
+          document.getElementById('page-title').textContent = `Sign Up - ${data.appName}`;
+          document.getElementById('app-name-nav').textContent = data.appName;
+          document.getElementById('footer-text').textContent = `© 2025 ${data.appName} - Image Provenance Service`;
+          document.getElementById('app').innerHTML = `
+            <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+              <div class="hero-content text-center py-12">
+                <div class="max-w-md">
+                  <h1 class="mb-5 text-4xl font-bold">📝 Sign Up</h1>
+                  <p class="mb-5 text-lg">${data.appName} アカウントを作成</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="flex justify-center">
+              <div class="card bg-base-100 shadow-xl w-full max-w-md">
+                <div class="card-body">
+                  <h2 class="card-title justify-center mb-4">サインアップ</h2>
+                  <a href="${data.signupUrl}" class="btn btn-primary btn-lg">
+                    <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Google でサインアップ
+                  </a>
+                  <div class="divider">OR</div>
+                  <p class="text-sm text-base-content/70">Already have an account?</p>
+                  <a href="${data.links.login}" class="btn btn-outline">ログイン</a>
+                </div>
+              </div>
+            </div>
+          `;
+          checkAuthAndRedirect();
+        })
+        .catch(error => {
+          document.getElementById('page-title').textContent = 'Error - Sign Up';
+          document.getElementById('app-name-nav').textContent = 'App';
+          document.getElementById('footer-text').textContent = '© 2025 Image Provenance Service';
+          document.getElementById('app').innerHTML = '<div class="alert alert-error"><span>Error loading signup page</span></div>';
+        });
+    </script>
+  </body>
+</html>
