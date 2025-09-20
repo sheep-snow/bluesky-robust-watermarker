@@ -357,13 +357,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                     <summary class="collapse-title font-semibold">投稿への反応の設定</summary>
                     <div class="collapse-content">
                       <div class="space-y-4">
-                        <div>
-                          <h4 class="font-medium text-sm mb-2">引用の設定</h4>
-                          <label class="cursor-pointer flex items-center gap-3">
-                            <input type="checkbox" id="quoteSettings" class="toggle toggle-primary" checked />
-                            <span class="label-text" id="quoteLabel">許可</span>
-                          </label>
-                        </div>
+
                         <div>
                           <h4 class="font-medium text-sm mb-2">返信の設定</h4>
                           <label class="cursor-pointer flex items-center gap-3">
@@ -459,7 +453,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                 <div>
                   <p class="text-base-content">Post ID: <span id="processingPostId" class="font-mono font-bold"></span></p>
                   <p class="text-sm text-base-content/70 mt-2" id="processingStatus">Generating provenance page...</p>
-                  <p class="text-xs text-base-content/50 mt-1" id="processingCountdown">タイムアウトまで: 180秒</p>
+                  <p class="text-xs text-base-content/50 mt-1" id="processingCountdown">最大待機時間: 180秒</p>
                 </div>
               </div>
               <div class="mt-6">
@@ -497,7 +491,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               const remaining = Math.max(0, Math.ceil((timeoutMs - elapsed) / 1000));
               const countdownEl = document.getElementById('processingCountdown');
               if (countdownEl) {
-                countdownEl.textContent = 'タイムアウトまで: ' + remaining + '秒';
+                countdownEl.textContent = '最大待機時間: ' + remaining + '秒';
                 if (remaining <= 30) {
                   countdownEl.style.color = '#ef4444';
                 }
@@ -611,11 +605,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               });
             });
             
-            // Handle quote settings toggle
-            document.getElementById('quoteSettings').addEventListener('change', function() {
-              const label = document.getElementById('quoteLabel');
-              label.textContent = this.checked ? '許可' : '不許可';
-            });
+
             
             // Handle reply settings toggle and visibility
             document.getElementById('replySettings').addEventListener('change', function() {
@@ -687,7 +677,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
               if (document.getElementById('labelGraphicMedia').checked) contentLabels.push('graphic-media');
               
               // Get interaction settings
-              const quoteSettings = document.getElementById('quoteSettings').checked ? 'allow' : 'deny';
               const replySettings = document.getElementById('replySettings').checked ? 'everyone' : 'none';
               const replyOptions = [];
               if (replySettings === 'everyone') {
@@ -742,7 +731,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
                 images: images,
                 contentLabels: contentLabels,
                 interactionSettings: {
-                  quote: quoteSettings,
                   reply: replySettings,
                   replyOptions: replyOptions
                 }
@@ -1064,7 +1052,6 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             text: body.text || '',
             contentLabels: body.contentLabels || [],
             interactionSettings: body.interactionSettings || {
-              quote: 'allow',
               reply: 'everyone',
               replyOptions: []
             },

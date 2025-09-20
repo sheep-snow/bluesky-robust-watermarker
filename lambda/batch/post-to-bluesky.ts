@@ -2,7 +2,7 @@ import { DecryptCommand, KMSClient } from '@aws-sdk/client-kms';
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SSMClient } from '@aws-sdk/client-ssm';
-const { AtpAgent } = require('@atproto/api');
+const { AtpAgent, AtUri } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
 const sharp = require('sharp');
 
@@ -208,38 +208,9 @@ export const handler = async (event: any) => {
       };
     }
 
-    // Add interaction settings if specified (prioritize event input over post data)
+    // Store interaction settings for later use
     const settings = interactionSettings || postData.interactionSettings;
-    if (settings) {
-      
-      // Quote settings
-      if (settings.quote === 'deny') {
-        postContent.tags = postContent.tags || [];
-        postContent.tags.push('!no-quote');
-      }
-      
-      // Reply settings
-      if (settings.reply === 'none') {
-        postContent.tags = postContent.tags || [];
-        postContent.tags.push('!no-reply');
-      } else if (settings.reply === 'everyone' && settings.replyOptions && settings.replyOptions.length > 0) {
-        // Add reply restrictions based on options
-        const replyGates = [];
-        if (settings.replyOptions.includes('mentioned')) {
-          replyGates.push({ $type: 'app.bsky.feed.postgate#mentionRule' });
-        }
-        if (settings.replyOptions.includes('following')) {
-          replyGates.push({ $type: 'app.bsky.feed.postgate#followingRule' });
-        }
-        if (settings.replyOptions.includes('followers')) {
-          replyGates.push({ $type: 'app.bsky.feed.postgate#listRule', list: 'followers' });
-        }
-        
-        if (replyGates.length > 0) {
-          postContent.replyGates = replyGates;
-        }
-      }
-    }
+    console.log('Interaction settings:', settings);
 
     // Add images if they exist
     if (postData.imageMetadata && postData.imageMetadata.length > 0) {
@@ -303,26 +274,68 @@ export const handler = async (event: any) => {
       record: postContent
     });
     
-    // If there are reply gates, create a separate postgate record
-    if (postContent.replyGates) {
-      try {
-        await agent.api.com.atproto.repo.createRecord({
-          repo: agent.session.did,
-          collection: 'app.bsky.feed.postgate',
-          record: {
-            $type: 'app.bsky.feed.postgate',
-            post: blueskyResult.data.uri,
-            detachedEmbeddingUris: [],
-            embeddingRules: postContent.replyGates,
-            createdAt: new Date().toISOString()
+    // Apply interaction settings after post creation
+    if (settings) {
+      console.log('Applying interaction settings:', settings);
+      
+      // Extract rkey from post URI for threadgate
+      const postUri = blueskyResult.data.uri;
+      const rkey = postUri.split('/').pop(); // Extract rkey from URI
+      console.log('Post URI:', postUri, 'Extracted rkey:', rkey);
+      
+      // Create threadgate for reply restrictions
+      if (settings.reply === 'none') {
+        try {
+          const threadgateResult = await agent.api.com.atproto.repo.createRecord({
+            repo: agent.session.did,
+            collection: 'app.bsky.feed.threadgate',
+            rkey: rkey, // Use same rkey as post
+            record: {
+              $type: 'app.bsky.feed.threadgate',
+              post: postUri,
+              allow: [], // Empty array = nobody can reply
+              createdAt: new Date().toISOString()
+            }
+          });
+          console.log('Threadgate created - replies disabled:', threadgateResult.data);
+        } catch (gateError) {
+          console.log('Failed to create threadgate for reply restriction:', gateError);
+          console.log('Error details:', JSON.stringify(gateError, null, 2));
+        }
+      } else if (settings.reply === 'everyone' && settings.replyOptions && settings.replyOptions.length > 0) {
+        try {
+          const allowRules = [];
+          if (settings.replyOptions.includes('mentioned')) {
+            allowRules.push({ $type: 'app.bsky.feed.threadgate#mentionRule' });
           }
-        });
-        console.log('Postgate created for reply restrictions');
-      } catch (gateError) {
-        console.log('Failed to create postgate, continuing without reply restrictions:', gateError);
+          if (settings.replyOptions.includes('following')) {
+            allowRules.push({ $type: 'app.bsky.feed.threadgate#followingRule' });
+          }
+          if (settings.replyOptions.includes('followers')) {
+            allowRules.push({ $type: 'app.bsky.feed.threadgate#followerRule' });
+          }
+          
+          const threadgateResult = await agent.api.com.atproto.repo.createRecord({
+            repo: agent.session.did,
+            collection: 'app.bsky.feed.threadgate',
+            rkey: rkey, // Use same rkey as post
+            record: {
+              $type: 'app.bsky.feed.threadgate',
+              post: postUri,
+              allow: allowRules,
+              createdAt: new Date().toISOString()
+            }
+          });
+          console.log('Threadgate created with reply restrictions:', threadgateResult.data);
+        } catch (gateError) {
+          console.log('Failed to create threadgate with restrictions:', gateError);
+        }
       }
+      
+
     }
     console.log('Posted to Bluesky:', blueskyResult.data);
+    console.log('Post URI for gates:', blueskyResult.data.uri);
     
     await updateProgress(postId, 'posting', 70, 'Bluesky post completed');
 
