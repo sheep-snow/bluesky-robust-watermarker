@@ -17,7 +17,7 @@ export class ResourcePolicy {
    * ログ保持期間（開発環境: 1週間、本番環境: 30日）
    */
   static getLogRetention(stage: string): logs.RetentionDays {
-    return logs.RetentionDays.ONE_MONTH;
+    return stage === 'prd' ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK;
   }
 
   /**

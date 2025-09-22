@@ -13,7 +13,7 @@ const stage = app.node.tryGetContext('stage') || 'dev';
 const appName = process.env.APP_NAME || 'brw';
 const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
-  region: 'us-east-1'
+  region: process.env.AWS_REGION || process.env.CDK_DEFAULT_REGION || 'us-east-1'
 };
 
 // 1. 共通スタック（最初にデプロイ）
@@ -31,16 +31,7 @@ const databaseStack = new DatabaseStack(app, `${appName}-${stage}-database`, {
 });
 databaseStack.addDependency(paramsResourceStack);
 
-// 3. API専用スタック
-const apiStack = new ApiStack(app, `${appName}-${stage}-api`, {
-  env,
-  stage,
-  appName,
-  paramsResourceStack
-});
-apiStack.addDependency(paramsResourceStack);
-
-// 4. 認証認可・公開バックエンド機能
+// 3. 認証認可・公開バックエンド機能
 const authBackendStack = new AuthBackendStack(app, `${appName}-${stage}-auth-backend`, {
   env,
   stage,
@@ -49,7 +40,7 @@ const authBackendStack = new AuthBackendStack(app, `${appName}-${stage}-auth-bac
 });
 authBackendStack.addDependency(paramsResourceStack);
 
-// 5. 投稿処理ワークフロー機能
+// 4. 投稿処理ワークフロー機能
 const batchStack = new BatchStack(app, `${appName}-${stage}-batch`, {
   env,
   stage,
@@ -59,14 +50,30 @@ const batchStack = new BatchStack(app, `${appName}-${stage}-batch`, {
 });
 batchStack.addDependency(databaseStack);
 
+// 5. API専用スタック
+const apiStack = new ApiStack(app, `${appName}-${stage}-api`, {
+  env,
+  stage,
+  appName,
+  paramsResourceStack,
+  userPoolClientId: cdk.Fn.importValue(`${appName}-${stage}-user-pool-client-id`),
+  domainName: process.env.DOMAIN_NAME,
+  postQueueUrl: cdk.Fn.importValue(`${appName}-${stage}-post-queue-url`)
+});
+apiStack.addDependency(paramsResourceStack);
+apiStack.addDependency(authBackendStack);
+apiStack.addDependency(batchStack);
+
 // 6. フロントエンドスタック
 const frontendStack = new FrontendStack(app, `${appName}-${stage}-frontend`, {
   env,
   stage,
   appName,
   paramsResourceStack,
+  authBackendStack,
   apiUrl: apiStack.api.url,
   domainName: process.env.DOMAIN_NAME,
   hostedZoneId: process.env.HOSTED_ZONE_ID
 });
 frontendStack.addDependency(apiStack);
+frontendStack.addDependency(authBackendStack);

@@ -1,0 +1,79 @@
+---
+import '../styles/global.css';
+---
+
+<html lang="ja" data-theme="cupcake">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Processing Login...</title>
+  </head>
+  <body class="min-h-screen flex items-center justify-center">
+    <div class="text-center">
+      <div class="loading loading-spinner loading-lg"></div>
+      <p class="mt-4">Processing login...</p>
+    </div>
+    
+    <script>
+      // Extract authorization code from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
+      
+      if (error) {
+        alert('Login failed: ' + error);
+        window.location.href = '/login';
+      } else if (code) {
+        // Get client configuration from API
+        fetch('/api/login')
+          .then(response => response.json())
+          .then(config => {
+            const cognitoDomain = config.cognitoDomain;
+            const clientId = config.clientId;
+            const redirectUri = `https://${config.domainName}/callback/`;
+            
+            console.log('Exchanging code for tokens:', { code, clientId, redirectUri });
+        
+            return fetch(`${cognitoDomain}/oauth2/token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: clientId,
+            code: code,
+            redirect_uri: redirectUri
+          })
+            });
+          })
+          .then(response => {
+            console.log('Token response status:', response.status);
+            return response.json();
+          })
+          .then(data => {
+            console.log('Token response data:', data);
+            if (data.access_token) {
+              localStorage.setItem('access_token', data.access_token);
+              localStorage.setItem('id_token', data.id_token);
+              localStorage.setItem('refresh_token', data.refresh_token);
+              console.log('Tokens stored, redirecting to mypage');
+              window.location.href = '/mypage';
+            } else {
+              console.error('No access token in response:', data);
+              alert('Login failed: ' + (data.error_description || data.error || 'No access token received'));
+              window.location.href = '/login';
+            }
+          })
+          .catch(error => {
+            console.error('Token exchange failed:', error);
+            alert('Login failed. Please try again.');
+            window.location.href = '/login';
+          });
+      } else {
+        window.location.href = '/login';
+      }
+    </script>
+  </body>
+</html>

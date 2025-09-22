@@ -20,7 +20,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     cognitoDomain: process.env.COGNITO_DOMAIN,
     clientId: process.env.USER_POOL_CLIENT_ID,
     domainName: process.env.DOMAIN_NAME,
-    loginUrl: `${process.env.COGNITO_DOMAIN}/oauth2/authorize?client_id=${process.env.USER_POOL_CLIENT_ID}&response_type=code&scope=email+openid&redirect_uri=https://${process.env.DOMAIN_NAME}/callback`,
+    loginUrl: `${process.env.COGNITO_DOMAIN}/oauth2/authorize?client_id=${process.env.USER_POOL_CLIENT_ID}&response_type=code&scope=email+openid&redirect_uri=https://${process.env.DOMAIN_NAME}/callback/`,
     links: {
       signup: '/signup',
       home: '/'

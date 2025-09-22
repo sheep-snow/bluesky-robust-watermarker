@@ -21,7 +21,7 @@ export class AuthBackendStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly certificate: acm.Certificate;
-  public readonly api: apigateway.RestApi;
+
 
   constructor(scope: Construct, id: string, props: AuthBackendStackProps) {
     super(scope, id, props);
@@ -65,18 +65,7 @@ export class AuthBackendStack extends cdk.Stack {
       }
     });
 
-    // API Gateway
-    this.api = new apigateway.RestApi(this, 'Api', {
-      restApiName: `${props.appName}-${props.stage}-api`,
-      description: '${props.appName} API Gateway',
-      binaryMediaTypes: ['image/*', 'multipart/form-data'],
-      defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key']
-      }
-      // 自動デプロイメントは有効のままにして、明示的なデプロイメントで上書き
-    });
+
 
     // User Pool Client
     this.userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
@@ -96,10 +85,10 @@ export class AuthBackendStack extends cdk.Stack {
           cognito.OAuthScope.OPENID
         ],
         callbackUrls: [
-          `https://${props.paramsResourceStack.domainName}/callback`
+          `https://${props.paramsResourceStack.domainName}/callback/`
         ],
         logoutUrls: [
-          `https://${props.paramsResourceStack.domainName}/logout`
+          `https://${props.paramsResourceStack.domainName}/logout/`
         ]
       },
       supportedIdentityProviders: [
@@ -145,20 +134,7 @@ export class AuthBackendStack extends cdk.Stack {
       exportName: `${props.appName}-${props.stage}-user-pool-client-id`
     });
 
-    new cdk.CfnOutput(this, 'ApiGatewayUrl', {
-      value: `https://${this.api.restApiId}.execute-api.${this.region}.amazonaws.com/prod/`,
-      exportName: `${props.appName}-${props.stage}-api-gateway-url`
-    });
 
-    new cdk.CfnOutput(this, 'ApiGatewayId', {
-      value: this.api.restApiId,
-      exportName: `${props.appName}-${props.stage}-api-gateway-id`
-    });
-
-    new cdk.CfnOutput(this, 'ApiGatewayRootResourceId', {
-      value: this.api.restApiRootResourceId,
-      exportName: `${props.appName}-${props.stage}-api-gateway-root-resource-id`
-    });
 
     // Route53 A Record (temporarily disabled for initial deployment)
     // new route53.ARecord(this, 'AliasRecord', {

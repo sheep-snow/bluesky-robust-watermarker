@@ -1,19 +1,20 @@
 import * as cdk from 'aws-cdk-lib';
-import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import { Construct } from 'constructs';
+import { AuthBackendStack } from './auth-backend-stack';
 import { ParamsResourceStack } from './params-resource-stack';
-import { ResourcePolicy } from './resource-policy';
 
 export interface FrontendStackProps extends cdk.StackProps {
   stage: string;
   appName: string;
   paramsResourceStack: ParamsResourceStack;
+  authBackendStack: AuthBackendStack;
   apiUrl: string;
   domainName?: string;
   hostedZoneId?: string;
@@ -27,7 +28,7 @@ export class FrontendStack extends cdk.Stack {
 
     // S3バケット（静的サイト用）
     const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
-      bucketName: `${props.appName}-${props.stage}-frontend-${this.account}-${this.region}`,
+      bucketName: `${props.appName}-websitebucket-${props.stage}-${this.account}`,
       websiteIndexDocument: 'index.html',
       websiteErrorDocument: 'index.html',
       publicReadAccess: true,
@@ -38,14 +39,10 @@ export class FrontendStack extends cdk.Stack {
     // カスタムドメインの設定
     let certificate: acm.ICertificate | undefined;
     let domainNames: string[] | undefined;
-    
+
     if (props.domainName) {
-      // 既存の証明書を参照
-      certificate = acm.Certificate.fromCertificateArn(
-        this,
-        'Certificate',
-        `arn:aws:acm:us-east-1:${this.account}:certificate/d510d7fa-6f5c-4cef-bdea-100ff453f38f`
-      );
+      // auth-backend-stackから証明書を参照
+      certificate = props.authBackendStack.certificate;
       domainNames = [props.domainName];
     }
 

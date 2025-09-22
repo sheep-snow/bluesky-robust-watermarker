@@ -9,6 +9,9 @@ export interface ApiStackProps extends cdk.StackProps {
   stage: string;
   appName: string;
   paramsResourceStack: ParamsResourceStack;
+  userPoolClientId?: string;
+  domainName?: string;
+  postQueueUrl?: string;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -52,9 +55,9 @@ export class ApiStack extends cdk.Stack {
       handler: 'handler',
       environment: {
         APP_NAME: props.appName,
-        COGNITO_DOMAIN: `https://${props.appName}-${props.stage}.auth.us-east-1.amazoncognito.com`,
-        USER_POOL_CLIENT_ID: 'placeholder',
-        DOMAIN_NAME: 'placeholder'
+        COGNITO_DOMAIN: `https://${props.appName}-${props.stage}.auth.${this.region}.amazoncognito.com`,
+        USER_POOL_CLIENT_ID: props.userPoolClientId || (() => { throw new Error('userPoolClientId is required'); })(),
+        DOMAIN_NAME: props.domainName || (() => { throw new Error('domainName is required'); })()
       },
       ...ResourcePolicy.getLambdaDefaults(props.stage)
     });
@@ -66,9 +69,9 @@ export class ApiStack extends cdk.Stack {
       handler: 'handler',
       environment: {
         APP_NAME: props.appName,
-        COGNITO_DOMAIN: `https://${props.appName}-${props.stage}.auth.us-east-1.amazoncognito.com`,
-        USER_POOL_CLIENT_ID: 'placeholder',
-        DOMAIN_NAME: 'placeholder'
+        COGNITO_DOMAIN: `https://${props.appName}-${props.stage}.auth.${this.region}.amazoncognito.com`,
+        USER_POOL_CLIENT_ID: props.userPoolClientId || (() => { throw new Error('userPoolClientId is required'); })(),
+        DOMAIN_NAME: props.domainName || (() => { throw new Error('domainName is required'); })()
       },
       ...ResourcePolicy.getLambdaDefaults(props.stage)
     });
@@ -83,7 +86,7 @@ export class ApiStack extends cdk.Stack {
         STAGE: props.stage,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
         POST_DATA_BUCKET: props.paramsResourceStack.provenanceInfoBucket.bucketName,
-        POST_QUEUE_URL: 'placeholder',
+        POST_QUEUE_URL: props.postQueueUrl || (() => { throw new Error('postQueueUrl is required'); })(),
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName
       },
       ...ResourcePolicy.getLambdaDefaults(props.stage)
@@ -99,9 +102,9 @@ export class ApiStack extends cdk.Stack {
       memorySize: 512,
       environment: {
         APP_NAME: props.appName,
-        DOMAIN_NAME: 'placeholder',
-        CLOUDFRONT_DOMAIN: 'placeholder',
-        VERIFICATION_RESULTS_TABLE: 'placeholder'
+        DOMAIN_NAME: props.domainName || (() => { throw new Error('domainName is required'); })(),
+        CLOUDFRONT_DOMAIN: props.domainName || (() => { throw new Error('domainName is required'); })(),
+        VERIFICATION_RESULTS_TABLE: (() => { throw new Error('VERIFICATION_RESULTS_TABLE is not implemented'); })()
       }
     });
 

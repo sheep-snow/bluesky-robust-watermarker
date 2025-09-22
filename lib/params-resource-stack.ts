@@ -67,7 +67,7 @@ export class ParamsResourceStack extends cdk.Stack {
 
     // S3バケット: ユーザー情報
     this.userInfoBucket = new s3.Bucket(this, 'UserInfoBucket', {
-      bucketName: `${props.appName}-${props.stage}-user-info-${this.account}-${this.region}`,
+      bucketName: `${props.appName}-userinfobucket-${props.stage}-${this.account}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       versioned: true,
@@ -76,7 +76,7 @@ export class ParamsResourceStack extends cdk.Stack {
 
     // S3バケット: 来歴情報保管
     this.provenanceInfoBucket = new s3.Bucket(this, 'ProvenanceInfoBucket', {
-      bucketName: `${props.appName}-${props.stage}-provenance-info-${this.account}-${this.region}`,
+      bucketName: `${props.appName}-provenanceinfobucket-${props.stage}-${this.account}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       versioned: true,
@@ -85,7 +85,7 @@ export class ParamsResourceStack extends cdk.Stack {
 
     // S3バケット: 来歴情報公開（CloudFrontからのアクセスのみ）
     this.provenancePublicBucket = new s3.Bucket(this, 'ProvenancePublicBucket', {
-      bucketName: `${props.appName}-${props.stage}-provenance-public-${this.account}-${this.region}`,
+      bucketName: `${props.appName}-provenancepublicbucket-${props.stage}-${this.account}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
