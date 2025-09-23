@@ -9,6 +9,7 @@ export interface DatabaseStackProps extends cdk.StackProps {
 
 export class DatabaseStack extends cdk.Stack {
   public readonly processingProgressTable: dynamodb.Table;
+  public readonly verificationResultsTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
@@ -20,6 +21,15 @@ export class DatabaseStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: 'ttl' // 24時間後に自動削除
+    });
+
+    // 検証結果テーブル
+    this.verificationResultsTable = new dynamodb.Table(this, 'VerificationResultsTable', {
+      tableName: `${props.appName}-${props.stage}-verification-results`,
+      partitionKey: { name: 'verification_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'ttl'
     });
 
     // 出力

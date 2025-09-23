@@ -19,6 +19,59 @@ function decodeJWT(token: string) {
   }
 }
 
+// Generate empty provenance list page for new users
+async function generateEmptyProvenanceList(userInfo: any) {
+  const content = `
+    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
+      <div class="hero-content text-center py-12">
+        <div class="max-w-md">
+          <h1 class="mb-5 text-4xl font-bold">📄 Provenance List</h1>
+          <h2 class="mb-5 text-2xl font-bold">${userInfo.blueskyUserId}</h2>
+          <p class="mb-5 text-lg">来歴の一覧</p>
+        </div>
+      </div>
+    </div>
+    <div class="hero min-h-64 bg-base-100 rounded-lg">
+      <div class="hero-content text-center">
+        <div class="max-w-md">
+          <div class="text-6xl mb-4">🔍</div>
+          <h3 class="text-xl font-bold mb-4">No Verified Posts Found</h3>
+          <p class="text-base-content/70">No verified posts found for this user yet.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const listPageHtml = `<!DOCTYPE html><html><head><title>${APP_NAME} - ${userInfo.blueskyUserId} Provenance List</title></head><body>${content}</body></html>`;
+
+  const listPageCommand = new PutObjectCommand({
+    Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
+    Key: `users/${userInfo.provenancePageId}.html`,
+    Body: listPageHtml,
+    ContentType: 'text/html'
+  });
+  await s3Client.send(listPageCommand);
+
+  console.log(`Empty provenance list created for user: ${userInfo.blueskyUserId}`);
+}
+
+// Check if provenance list exists for a user
+async function checkProvenanceListExists(provenancePageId: string): Promise<boolean> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
+      Key: `users/${provenancePageId}.html`
+    });
+    await s3Client.send(command);
+    return true;
+  } catch (error: any) {
+    if (error.name === 'NoSuchKey') {
+      return false;
+    }
+    throw error;
+  }
+}
+
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
 const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
@@ -74,14 +127,37 @@ async function encryptPassword(password: string, keyId: string) {
 }
 
 async function validateBlueskyCredentials(userId: string, appPassword: string) {
+  console.log('Starting Bluesky validation for:', userId);
+
   try {
     const agent = new AtpAgent({ service: 'https://bsky.social' });
-    const loginResult = await agent.login({
-      identifier: userId,
-      password: appPassword
-    });
-    return agent.session ? true : false;
+    console.log('AtpAgent created successfully');
+
+    try {
+      const loginResult = await agent.login({
+        identifier: userId,
+        password: appPassword
+      });
+
+      console.log('✅ Login successful!');
+      if (agent.session) {
+        console.log('✅ Session created successfully');
+        console.log('Session DID:', agent.session.did);
+        console.log('Session handle:', agent.session.handle);
+        return true;
+      } else {
+        console.log('⚠️ Login succeeded but no session created');
+        return false;
+      }
+    } catch (loginError: any) {
+      console.log('❌ Login failed with error:');
+      console.log('Error message:', loginError.message);
+      return false;
+    }
+
   } catch (error: any) {
+    console.error('❌ Fatal error in validateBlueskyCredentials:');
+    console.error('Error message:', error.message);
     return false;
   }
 }
@@ -117,20 +193,32 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         }
 
         const userInfo = await getUserInfo(userId);
+
+        // If user info exists but provenance list doesn't exist, create it
+        if (userInfo && userInfo.provenancePageId) {
+          try {
+            const provenanceListExists = await checkProvenanceListExists(userInfo.provenancePageId);
+            if (!provenanceListExists) {
+              console.log(`Provenance list not found for user ${userInfo.blueskyUserId}, creating empty list`);
+              await generateEmptyProvenanceList(userInfo);
+            }
+          } catch (error) {
+            console.error('Failed to check/create provenance list:', error);
+            // Don't fail the entire request if provenance list check fails
+          }
+        }
+
         return { statusCode: 200, headers, body: JSON.stringify(userInfo || {}) };
       }
 
+      // Return basic page info for GET /api/mypage
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           title: `${APP_NAME} - My Page`,
-          description: 'Blueskyのアプリパスワードを登録し、作品を投稿する',
-          endpoints: {
-            userInfo: '/api/mypage/info',
-            saveSettings: '/api/mypage',
-            createPost: '/api/mypage/post'
-          }
+          appName: APP_NAME,
+          description: 'Blueskyのアプリパスワードを登録し、作品を投稿する'
         })
       };
     }
@@ -244,7 +332,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           ...(existingUserInfo && { createdAt: existingUserInfo.createdAt })
         };
 
-        if (!existingUserInfo) {
+        const isNewUser = !existingUserInfo;
+        if (isNewUser) {
           userInfo.createdAt = userInfo.updatedAt;
         }
 
@@ -256,6 +345,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         });
 
         await s3Client.send(putCommand);
+
+        // Generate empty provenance list for new users
+        if (isNewUser) {
+          try {
+            await generateEmptyProvenanceList(userInfo);
+            console.log(`Empty provenance list created for new user: ${userInfo.blueskyUserId}`);
+          } catch (error) {
+            console.error('Failed to create empty provenance list:', error);
+            // Don't fail the entire request if provenance list creation fails
+          }
+        }
 
         return { statusCode: 200, headers, body: JSON.stringify({ message: '設定を保存しました' }) };
       }

@@ -3,12 +3,14 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { ParamsResourceStack } from './params-resource-stack';
+import { DatabaseStack } from './database-stack';
 import { ResourcePolicy } from './resource-policy';
 
 export interface ApiStackProps extends cdk.StackProps {
   stage: string;
   appName: string;
   paramsResourceStack: ParamsResourceStack;
+  databaseStack: DatabaseStack;
   userPoolClientId?: string;
   domainName?: string;
   postQueueUrl?: string;
@@ -104,7 +106,7 @@ export class ApiStack extends cdk.Stack {
         APP_NAME: props.appName,
         DOMAIN_NAME: props.domainName || (() => { throw new Error('domainName is required'); })(),
         CLOUDFRONT_DOMAIN: props.domainName || (() => { throw new Error('domainName is required'); })(),
-        VERIFICATION_RESULTS_TABLE: (() => { throw new Error('VERIFICATION_RESULTS_TABLE is not implemented'); })()
+        VERIFICATION_RESULTS_TABLE: props.databaseStack.verificationResultsTable.tableName
       }
     });
 
@@ -112,6 +114,14 @@ export class ApiStack extends cdk.Stack {
     props.paramsResourceStack.userInfoBucket.grantReadWrite(mypageApiFunction);
     props.paramsResourceStack.provenanceInfoBucket.grantReadWrite(mypageApiFunction);
     props.paramsResourceStack.provenancePublicBucket.grantReadWrite(mypageApiFunction);
+    props.paramsResourceStack.kmsKey.grantEncryptDecrypt(mypageApiFunction);
+    
+    // Grant SSM parameter access
+    mypageApiFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      effect: cdk.aws_iam.Effect.ALLOW,
+      actions: ['ssm:GetParameter'],
+      resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/${props.appName}/${props.stage}/kms-key-id`]
+    }));
 
     // Login/Signup API統合
     const loginResource = apiResource.addResource('login');

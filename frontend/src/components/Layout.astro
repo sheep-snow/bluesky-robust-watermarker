@@ -1,0 +1,175 @@
+---
+export interface Props {
+  title: string;
+  currentPage?: string;
+}
+
+const { title, currentPage = '' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+</head>
+<body class="min-h-screen flex flex-col">
+  <div class="navbar bg-base-100 shadow-lg">
+    <div class="navbar-start">
+      <div class="dropdown">
+        <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"></path>
+          </svg>
+        </div>
+        <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+          <li><a href="/" class={currentPage === 'home' ? 'active' : ''}>Home</a></li>
+          <li><a href="/signup" class={currentPage === 'signup' ? 'active' : ''} id="mobile-signup">Sign Up</a></li>
+          <li><a href="/login" class={currentPage === 'login' ? 'active' : ''} id="mobile-login">Login</a></li>
+          <li><a href="/mypage" class={currentPage === 'mypage' ? 'active' : ''}>My Page</a></li>
+          <li><a href="/verify-watermark" class={currentPage === 'verify-watermark' ? 'active' : ''}>Verify</a></li>
+        </ul>
+      </div>
+      <a href="/" class="btn btn-ghost text-xl" id="app-name-nav">Loading...</a>
+    </div>
+    <div class="navbar-center hidden lg:flex">
+      <ul class="menu menu-horizontal px-1">
+        <li><a href="/" class={currentPage === 'home' ? 'active' : ''}>Home</a></li>
+        <li><a href="/signup" class={currentPage === 'signup' ? 'active' : ''} id="desktop-signup">Sign Up</a></li>
+        <li><a href="/login" class={currentPage === 'login' ? 'active' : ''} id="desktop-login">Login</a></li>
+        <li><a href="/mypage" class={currentPage === 'mypage' ? 'active' : ''}>My Page</a></li>
+        <li><a href="/verify-watermark" class={currentPage === 'verify-watermark' ? 'active' : ''}>Verify</a></li>
+      </ul>
+    </div>
+    <div class="navbar-end">
+      <div class="hidden" id="auth-actions">
+        <button onclick="logout()" class="btn btn-error btn-sm mr-2">Logout</button>
+      </div>
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto">
+          <li class="menu-title">Choose Theme</li>
+          <li><a onclick="changeTheme('light')">🌞 Light</a></li>
+          <li><a onclick="changeTheme('dark')">🌙 Dark</a></li>
+          <li><a onclick="changeTheme('cupcake')">🧁 Cupcake</a></li>
+          <li><a onclick="changeTheme('bumblebee')">🐝 Bumblebee</a></li>
+          <li><a onclick="changeTheme('emerald')">💎 Emerald</a></li>
+          <li><a onclick="changeTheme('corporate')">🏢 Corporate</a></li>
+          <li><a onclick="changeTheme('synthwave')">🌆 Synthwave</a></li>
+          <li><a onclick="changeTheme('retro')">📻 Retro</a></li>
+          <li><a onclick="changeTheme('cyberpunk')">🤖 Cyberpunk</a></li>
+          <li><a onclick="changeTheme('valentine')">💝 Valentine</a></li>
+          <li><a onclick="changeTheme('halloween')">🎃 Halloween</a></li>
+          <li><a onclick="changeTheme('garden')">🌸 Garden</a></li>
+          <li><a onclick="changeTheme('forest')">🌲 Forest</a></li>
+          <li><a onclick="changeTheme('aqua')">🌊 Aqua</a></li>
+          <li><a onclick="changeTheme('lofi')">🎵 Lofi</a></li>
+          <li><a onclick="changeTheme('pastel')">🎨 Pastel</a></li>
+          <li><a onclick="changeTheme('fantasy')">🦄 Fantasy</a></li>
+          <li><a onclick="changeTheme('wireframe')">📐 Wireframe</a></li>
+          <li><a onclick="changeTheme('black')">⚫ Black</a></li>
+          <li><a onclick="changeTheme('luxury')">💰 Luxury</a></li>
+          <li><a onclick="changeTheme('dracula')">🧛 Dracula</a></li>
+          <li><a onclick="changeTheme('cmyk')">🎨 CMYK</a></li>
+          <li><a onclick="changeTheme('autumn')">🍂 Autumn</a></li>
+          <li><a onclick="changeTheme('business')">💼 Business</a></li>
+          <li><a onclick="changeTheme('acid')">🧪 Acid</a></li>
+          <li><a onclick="changeTheme('lemonade')">🍋 Lemonade</a></li>
+          <li><a onclick="changeTheme('night')">🌃 Night</a></li>
+          <li><a onclick="changeTheme('coffee')">☕ Coffee</a></li>
+          <li><a onclick="changeTheme('winter')">❄️ Winter</a></li>
+          <li><a onclick="changeTheme('dim')">🔅 Dim</a></li>
+          <li><a onclick="changeTheme('nord')">🏔️ Nord</a></li>
+          <li><a onclick="changeTheme('sunset')">🌅 Sunset</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <main class="flex-1 container mx-auto px-4 py-8">
+    <slot />
+  </main>
+  
+  <footer class="footer footer-center p-10 bg-base-200 text-base-content rounded">
+    <aside>
+      <p id="footer-text">© 2025 Loading... - Image Provenance Service</p>
+    </aside>
+  </footer>
+
+  <script>
+    // テーマ管理 - グローバル関数
+    window.initTheme = function() {
+      const savedTheme = localStorage.getItem('brw-theme') || 'cupcake';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+    
+    window.changeTheme = function(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('brw-theme', theme);
+    }
+    
+    window.logout = function() {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/';
+    }
+    
+    // 認証状態チェックとナビゲーション制御
+    function checkAuthAndUpdateNav() {
+      const accessToken = localStorage.getItem('access_token');
+      const idToken = localStorage.getItem('id_token');
+      const isAuthenticated = accessToken && idToken;
+      
+      // デスクトップとモバイルのSignup/Loginリンクを制御
+      const signupLinks = [document.getElementById('desktop-signup'), document.getElementById('mobile-signup')];
+      const loginLinks = [document.getElementById('desktop-login'), document.getElementById('mobile-login')];
+      const authActions = document.getElementById('auth-actions');
+      
+      signupLinks.forEach(link => {
+        if (link && link.closest('li')) {
+          link.closest('li').style.display = isAuthenticated ? 'none' : '';
+        }
+      });
+      
+      loginLinks.forEach(link => {
+        if (link && link.closest('li')) {
+          link.closest('li').style.display = isAuthenticated ? 'none' : '';
+        }
+      });
+      
+      if (authActions) {
+        authActions.classList.toggle('hidden', !isAuthenticated);
+      }
+    }
+    
+    // アプリ名を取得
+    function loadAppName() {
+      fetch('/api/')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('app-name-nav').textContent = data.appName;
+          document.getElementById('footer-text').textContent = `© 2025 ${data.appName} - Image Provenance Service`;
+        })
+        .catch(() => {
+          document.getElementById('app-name-nav').textContent = 'App';
+          document.getElementById('footer-text').textContent = '© 2025 App - Image Provenance Service';
+        });
+    }
+    
+    // ページ読み込み時の初期化
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      checkAuthAndUpdateNav();
+      loadAppName();
+    });
+  </script>
+</body>
+</html>

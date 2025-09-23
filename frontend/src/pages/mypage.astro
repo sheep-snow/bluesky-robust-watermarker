@@ -1,36 +1,8 @@
 ---
-// MyPage - Astro frontend page
+import Layout from '../components/Layout.astro';
 ---
 
-<!DOCTYPE html>
-<html data-theme="cupcake">
-<head>
-    <title id="page-title">Loading - My Page</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
-</head>
-<body class="min-h-screen flex flex-col">
-    <div class="navbar bg-base-100 shadow-lg">
-        <div class="navbar-start">
-            <a href="/" class="btn btn-ghost text-xl" id="app-name-nav">Loading...</a>
-        </div>
-        <div class="navbar-center hidden lg:flex">
-            <ul class="menu menu-horizontal px-1">
-                <li><a href="/">Home</a></li>
-                <li><a href="/signup">Sign Up</a></li>
-                <li><a href="/login">Login</a></li>
-                <li><a href="/mypage" class="active">My Page</a></li>
-                <li><a href="/verify-watermark">Verify</a></li>
-            </ul>
-        </div>
-        <div class="navbar-end">
-            <button onclick="logout()" class="btn btn-error btn-sm hidden" id="logout-btn">Logout</button>
-        </div>
-    </div>
-
-    <main class="flex-1 container mx-auto px-4 py-8">
+<Layout title="Loading - My Page" currentPage="mypage">
         <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
             <div class="hero-content text-center py-12">
                 <div class="max-w-md">
@@ -102,6 +74,68 @@
                                     </div>
                                 </div>
                             </div>
+                            <details class="collapse bg-base-100 border-base-300 border">
+                                <summary class="collapse-title font-semibold">投稿への反応の設定</summary>
+                                <div class="collapse-content">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <h4 class="font-medium text-sm mb-2">返信の設定</h4>
+                                            <label class="cursor-pointer flex items-center gap-3">
+                                                <input type="checkbox" id="replySettings" class="toggle toggle-primary" checked />
+                                                <span class="label-text" id="replyLabel">全員</span>
+                                            </label>
+                                            <div id="replyOptions" class="mt-3 pl-6">
+                                                <h5 class="font-medium text-xs mb-2 text-base-content/70">オプション</h5>
+                                                <div class="space-y-2">
+                                                    <label class="cursor-pointer label justify-start gap-3">
+                                                        <input type="checkbox" id="replyMentioned" class="checkbox checkbox-sm reply-option" />
+                                                        <span class="label-text text-sm">メンションされたユーザー</span>
+                                                    </label>
+                                                    <label class="cursor-pointer label justify-start gap-3">
+                                                        <input type="checkbox" id="replyFollowing" class="checkbox checkbox-sm reply-option" />
+                                                        <span class="label-text text-sm">フォローしているユーザー</span>
+                                                    </label>
+                                                    <label class="cursor-pointer label justify-start gap-3">
+                                                        <input type="checkbox" id="replyFollowers" class="checkbox checkbox-sm reply-option" />
+                                                        <span class="label-text text-sm">フォロワー</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                            <details class="collapse bg-base-100 border-base-300 border">
+                                <summary class="collapse-title font-semibold">ラベル</summary>
+                                <div class="collapse-content">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <h4 class="font-medium text-sm mb-2">成人向けコンテンツ</h4>
+                                            <div class="space-y-2">
+                                                <label class="cursor-pointer label justify-start gap-3">
+                                                    <input type="checkbox" id="labelSuggestive" value="suggestive" class="checkbox checkbox-sm adult-content-checkbox" />
+                                                    <span class="label-text">きわどい</span>
+                                                </label>
+                                                <label class="cursor-pointer label justify-start gap-3">
+                                                    <input type="checkbox" id="labelNudity" value="nudity" class="checkbox checkbox-sm adult-content-checkbox" />
+                                                    <span class="label-text">ヌード</span>
+                                                </label>
+                                                <label class="cursor-pointer label justify-start gap-3">
+                                                    <input type="checkbox" id="labelPorn" value="porn" class="checkbox checkbox-sm adult-content-checkbox" />
+                                                    <span class="label-text">成人向け</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-medium text-sm mb-2">その他</h4>
+                                            <label class="cursor-pointer label justify-start gap-3">
+                                                <input type="checkbox" id="labelGraphicMedia" class="checkbox checkbox-sm" />
+                                                <span class="label-text">生々しいメディア</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
                             <button type="submit" id="postSubmitBtn" class="btn btn-accent w-full" disabled>投稿</button>
                         </form>
                     </div>
@@ -128,36 +162,58 @@
                 </div>
             </div>
         </div>
-    </main>
-
+    
     <script>
-        // Load app name from API
-        fetch('/api/mypage')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('page-title').textContent = `${data.title}`;
-                document.getElementById('app-name-nav').textContent = data.title.split(' - ')[0];
-            })
-            .catch(() => {
-                document.getElementById('page-title').textContent = 'App - My Page';
-                document.getElementById('app-name-nav').textContent = 'App';
-            });
-        
-        const accessToken = localStorage.getItem('access_token');
-        const idToken = localStorage.getItem('id_token');
-        
-        if (!accessToken || !idToken) {
-            document.getElementById('authStatus').innerHTML = 
-                '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><span>まだログインしていません。 <a href="/signup" class="link">サインアップしてください。</a> or <a href="/login" class="link">login</a>.</span>';
-            document.getElementById('authStatus').className = 'alert alert-warning';
-        } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load app name from API
+            fetch('/api/mypage')
+                .then(response => response.json())
+                .then(data => {
+                    document.title = `${data.title}`;
+                })
+                .catch(() => {
+                    document.title = 'App - My Page';
+                });
+            
+            const accessToken = localStorage.getItem('access_token');
+            const idToken = localStorage.getItem('id_token');
+            
+            if (!accessToken || !idToken) {
+                document.getElementById('authStatus').innerHTML = 
+                    '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg><span>まだログインしていません。 <a href="/signup" class="link">サインアップしてください。</a> or <a href="/login" class="link">login</a>.</span>';
+                document.getElementById('authStatus').className = 'alert alert-warning';
+            } else {
             document.getElementById('authStatus').classList.add('hidden');
             document.getElementById('content').classList.remove('hidden');
-            document.getElementById('logout-btn').classList.remove('hidden');
             
             loadUserInfo();
             initializeImageInputs();
             validateSubmitButton();
+            
+            // Handle adult content checkbox exclusivity
+            document.querySelectorAll('.adult-content-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        document.querySelectorAll('.adult-content-checkbox').forEach(other => {
+                            if (other !== this) other.checked = false;
+                        });
+                    }
+                });
+            });
+            
+            // Handle reply settings toggle and visibility
+            document.getElementById('replySettings').addEventListener('change', function() {
+                const label = document.getElementById('replyLabel');
+                const replyOptions = document.getElementById('replyOptions');
+                
+                if (this.checked) {
+                    label.textContent = '全員';
+                    replyOptions.style.display = 'block';
+                } else {
+                    label.textContent = '返信不可';
+                    replyOptions.style.display = 'none';
+                }
+            });
             
             // Settings form submission
             document.getElementById('settingsForm').addEventListener('submit', async (e) => {
@@ -173,7 +229,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + accessToken
+                            'Authorization': 'Bearer ' + idToken
                         },
                         body: JSON.stringify(data)
                     });
@@ -195,6 +251,23 @@
                 e.preventDefault();
                 
                 const text = document.getElementById('postText').value;
+                
+                // Get content labels
+                const contentLabels = [];
+                const adultContentCheckboxes = document.querySelectorAll('.adult-content-checkbox:checked');
+                if (adultContentCheckboxes.length > 0) contentLabels.push(adultContentCheckboxes[0].value);
+                if (document.getElementById('labelGraphicMedia').checked) contentLabels.push('graphic-media');
+                
+                // Get interaction settings
+                const replySettings = document.getElementById('replySettings').checked ? 'everyone' : 'none';
+                const replyOptions = [];
+                if (replySettings === 'everyone') {
+                    if (document.getElementById('replyMentioned').checked) replyOptions.push('mentioned');
+                    if (document.getElementById('replyFollowing').checked) replyOptions.push('following');
+                    if (document.getElementById('replyFollowers').checked) replyOptions.push('followers');
+                }
+                
+                // Process multiple images
                 const images = [];
                 const imageRows = document.querySelectorAll('.image-row');
                 
@@ -226,10 +299,10 @@
                 const postData = {
                     text: text,
                     images: images,
-                    contentLabels: [],
+                    contentLabels: contentLabels,
                     interactionSettings: {
-                        reply: 'everyone',
-                        replyOptions: []
+                        reply: replySettings,
+                        replyOptions: replyOptions
                     }
                 };
                 
@@ -237,7 +310,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + accessToken
+                        'Authorization': 'Bearer ' + idToken
                     },
                     body: JSON.stringify(postData)
                 });
@@ -246,6 +319,7 @@
                     const result = await response.json();
                     alert('投稿が完了しました！Post ID: ' + result.postId);
                     document.getElementById('postForm').reset();
+                    validateSubmitButton();
                 } else {
                     const errorData = await response.json();
                     alert('投稿に失敗しました: ' + (errorData.error || 'Unknown error'));
@@ -253,12 +327,20 @@
             });
         }
         
+        // 関数をグローバルスコープに移動
+        window.loadUserInfo = loadUserInfo;
+        window.initializeImageInputs = initializeImageInputs;
+        window.validateSubmitButton = validateSubmitButton;
+        window.updateImageButtons = updateImageButtons;
+        
+        });
+        
         async function loadUserInfo() {
             try {
                 const response = await fetch('/api/mypage/info', {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Bearer ' + accessToken
+                        'Authorization': 'Bearer ' + idToken
                     }
                 });
                 
@@ -354,13 +436,5 @@
             addBtn.disabled = currentRows >= 4;
             removeBtn.disabled = currentRows <= 1;
         }
-        
-        function logout() {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('id_token');
-            localStorage.removeItem('refresh_token');
-            window.location.href = '/';
-        }
     </script>
-</body>
-</html>
+</Layout>

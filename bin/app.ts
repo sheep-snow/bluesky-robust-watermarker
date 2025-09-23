@@ -56,11 +56,13 @@ const apiStack = new ApiStack(app, `${appName}-${stage}-api`, {
   stage,
   appName,
   paramsResourceStack,
+  databaseStack,
   userPoolClientId: cdk.Fn.importValue(`${appName}-${stage}-user-pool-client-id`),
   domainName: process.env.DOMAIN_NAME,
   postQueueUrl: cdk.Fn.importValue(`${appName}-${stage}-post-queue-url`)
 });
 apiStack.addDependency(paramsResourceStack);
+apiStack.addDependency(databaseStack);
 apiStack.addDependency(authBackendStack);
 apiStack.addDependency(batchStack);
 

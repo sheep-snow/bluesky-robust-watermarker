@@ -1,33 +1,8 @@
 ---
-// Verify Watermark - Astro frontend page
+import Layout from '../components/Layout.astro';
 ---
 
-<!DOCTYPE html>
-<html data-theme="cupcake">
-<head>
-    <title id="page-title">Loading - 透かしの確認</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
-</head>
-<body class="min-h-screen flex flex-col">
-    <div class="navbar bg-base-100 shadow-lg">
-        <div class="navbar-start">
-            <a href="/" class="btn btn-ghost text-xl" id="app-name-nav">Loading...</a>
-        </div>
-        <div class="navbar-center hidden lg:flex">
-            <ul class="menu menu-horizontal px-1">
-                <li><a href="/">Home</a></li>
-                <li><a href="/signup">Sign Up</a></li>
-                <li><a href="/login">Login</a></li>
-                <li><a href="/mypage">My Page</a></li>
-                <li><a href="/verify-watermark" class="active">Verify</a></li>
-            </ul>
-        </div>
-    </div>
-
-    <main class="flex-1 container mx-auto px-4 py-8">
+<Layout title="Loading - 透かしの確認" currentPage="verify-watermark">
         <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg mb-8">
             <div class="hero-content text-center py-12">
                 <div class="max-w-md">
@@ -79,19 +54,16 @@
         </div>
         
         <div id="result" class="hidden mt-8"></div>
-    </main>
-
+    
     <script>
         // Load app name from API
         fetch('/api/verify-watermark')
             .then(response => response.json())
             .then(data => {
-                document.getElementById('page-title').textContent = data.title;
-                document.getElementById('app-name-nav').textContent = data.title.split(' - ')[0];
+                document.title = data.title;
             })
             .catch(() => {
-                document.getElementById('page-title').textContent = 'App - 透かしの確認';
-                document.getElementById('app-name-nav').textContent = 'App';
+                document.title = 'App - 透かしの確認';
             });
         
         let selectedFile = null;
@@ -221,5 +193,4 @@
             }
         }
     </script>
-</body>
-</html>
+</Layout>

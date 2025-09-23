@@ -1,19 +1,14 @@
 ---
-import '../styles/global.css';
+import Layout from '../components/Layout.astro';
 ---
 
-<html lang="ja" data-theme="cupcake">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Processing Login...</title>
-  </head>
-  <body class="min-h-screen flex items-center justify-center">
+<Layout title="Processing Login..." currentPage="">
+  <div class="min-h-96 flex items-center justify-center">
     <div class="text-center">
       <div class="loading loading-spinner loading-lg"></div>
       <p class="mt-4">Processing login...</p>
     </div>
+  </div>
     
     <script>
       // Extract authorization code from URL
@@ -75,5 +70,4 @@ import '../styles/global.css';
         window.location.href = '/login';
       }
     </script>
-  </body>
-</html>
+</Layout>
