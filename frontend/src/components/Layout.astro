@@ -56,38 +56,38 @@ const { title, currentPage = '' } = Astro.props;
         </div>
         <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 max-h-96 overflow-y-auto">
           <li class="menu-title">Choose Theme</li>
-          <li><a onclick="changeTheme('light')">🌞 Light</a></li>
-          <li><a onclick="changeTheme('dark')">🌙 Dark</a></li>
-          <li><a onclick="changeTheme('cupcake')">🧁 Cupcake</a></li>
-          <li><a onclick="changeTheme('bumblebee')">🐝 Bumblebee</a></li>
-          <li><a onclick="changeTheme('emerald')">💎 Emerald</a></li>
-          <li><a onclick="changeTheme('corporate')">🏢 Corporate</a></li>
-          <li><a onclick="changeTheme('synthwave')">🌆 Synthwave</a></li>
-          <li><a onclick="changeTheme('retro')">📻 Retro</a></li>
-          <li><a onclick="changeTheme('cyberpunk')">🤖 Cyberpunk</a></li>
-          <li><a onclick="changeTheme('valentine')">💝 Valentine</a></li>
-          <li><a onclick="changeTheme('halloween')">🎃 Halloween</a></li>
-          <li><a onclick="changeTheme('garden')">🌸 Garden</a></li>
-          <li><a onclick="changeTheme('forest')">🌲 Forest</a></li>
-          <li><a onclick="changeTheme('aqua')">🌊 Aqua</a></li>
-          <li><a onclick="changeTheme('lofi')">🎵 Lofi</a></li>
-          <li><a onclick="changeTheme('pastel')">🎨 Pastel</a></li>
-          <li><a onclick="changeTheme('fantasy')">🦄 Fantasy</a></li>
-          <li><a onclick="changeTheme('wireframe')">📐 Wireframe</a></li>
-          <li><a onclick="changeTheme('black')">⚫ Black</a></li>
-          <li><a onclick="changeTheme('luxury')">💰 Luxury</a></li>
-          <li><a onclick="changeTheme('dracula')">🧛 Dracula</a></li>
-          <li><a onclick="changeTheme('cmyk')">🎨 CMYK</a></li>
-          <li><a onclick="changeTheme('autumn')">🍂 Autumn</a></li>
-          <li><a onclick="changeTheme('business')">💼 Business</a></li>
-          <li><a onclick="changeTheme('acid')">🧪 Acid</a></li>
-          <li><a onclick="changeTheme('lemonade')">🍋 Lemonade</a></li>
-          <li><a onclick="changeTheme('night')">🌃 Night</a></li>
-          <li><a onclick="changeTheme('coffee')">☕ Coffee</a></li>
-          <li><a onclick="changeTheme('winter')">❄️ Winter</a></li>
-          <li><a onclick="changeTheme('dim')">🔅 Dim</a></li>
-          <li><a onclick="changeTheme('nord')">🏔️ Nord</a></li>
-          <li><a onclick="changeTheme('sunset')">🌅 Sunset</a></li>
+          <li><a href="#" data-theme="light">🌞 Light</a></li>
+          <li><a href="#" data-theme="dark">🌙 Dark</a></li>
+          <li><a href="#" data-theme="cupcake">🧁 Cupcake</a></li>
+          <li><a href="#" data-theme="bumblebee">🐝 Bumblebee</a></li>
+          <li><a href="#" data-theme="emerald">💎 Emerald</a></li>
+          <li><a href="#" data-theme="corporate">🏢 Corporate</a></li>
+          <li><a href="#" data-theme="synthwave">🌆 Synthwave</a></li>
+          <li><a href="#" data-theme="retro">📻 Retro</a></li>
+          <li><a href="#" data-theme="cyberpunk">🤖 Cyberpunk</a></li>
+          <li><a href="#" data-theme="valentine">💝 Valentine</a></li>
+          <li><a href="#" data-theme="halloween">🎃 Halloween</a></li>
+          <li><a href="#" data-theme="garden">🌸 Garden</a></li>
+          <li><a href="#" data-theme="forest">🌲 Forest</a></li>
+          <li><a href="#" data-theme="aqua">🌊 Aqua</a></li>
+          <li><a href="#" data-theme="lofi">🎵 Lofi</a></li>
+          <li><a href="#" data-theme="pastel">🎨 Pastel</a></li>
+          <li><a href="#" data-theme="fantasy">🦄 Fantasy</a></li>
+          <li><a href="#" data-theme="wireframe">📐 Wireframe</a></li>
+          <li><a href="#" data-theme="black">⚫ Black</a></li>
+          <li><a href="#" data-theme="luxury">💰 Luxury</a></li>
+          <li><a href="#" data-theme="dracula">🧛 Dracula</a></li>
+          <li><a href="#" data-theme="cmyk">🎨 CMYK</a></li>
+          <li><a href="#" data-theme="autumn">🍂 Autumn</a></li>
+          <li><a href="#" data-theme="business">💼 Business</a></li>
+          <li><a href="#" data-theme="acid">🧪 Acid</a></li>
+          <li><a href="#" data-theme="lemonade">🍋 Lemonade</a></li>
+          <li><a href="#" data-theme="night">🌃 Night</a></li>
+          <li><a href="#" data-theme="coffee">☕ Coffee</a></li>
+          <li><a href="#" data-theme="winter">❄️ Winter</a></li>
+          <li><a href="#" data-theme="dim">🔅 Dim</a></li>
+          <li><a href="#" data-theme="nord">🏔️ Nord</a></li>
+          <li><a href="#" data-theme="sunset">🌅 Sunset</a></li>
         </ul>
       </div>
     </div>
@@ -169,6 +169,15 @@ const { title, currentPage = '' } = Astro.props;
       initTheme();
       checkAuthAndUpdateNav();
       loadAppName();
+      
+      // テーマ選択のイベントリスナー
+      document.querySelectorAll('[data-theme]').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const theme = e.target.getAttribute('data-theme');
+          changeTheme(theme);
+        });
+      });
     });
   </script>
 </body>

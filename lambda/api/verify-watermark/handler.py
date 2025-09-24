@@ -62,23 +62,30 @@ def extract_image_from_multipart(body: bytes, content_type: str) -> Optional[byt
         if not boundary:
             return None
 
-        body_string = body.decode("utf-8") if isinstance(body, bytes) else str(body)
-        parts = body_string.split(f"--{boundary}")
+        # Handle binary data properly
+        if isinstance(body, str):
+            body = body.encode('latin-1')
+        
+        boundary_bytes = f"--{boundary}".encode('latin-1')
+        parts = body.split(boundary_bytes)
 
-        for i in range(1, len(parts) - 1):
-            part = parts[i]
-            header_end_index = part.find("\\r\\n\\r\\n")
-            if header_end_index == -1:
+        for part in parts[1:-1]:  # Skip first empty and last closing parts
+            if not part:
+                continue
+                
+            # Find header/content separator
+            header_end = part.find(b'\r\n\r\n')
+            if header_end == -1:
                 continue
 
-            headers = part[:header_end_index]
-            content = part[header_end_index + 4:]
+            headers = part[:header_end].decode('latin-1')
+            content = part[header_end + 4:]
 
-            if 'name="image"' in headers and "Content-Type: image/" in headers:
-                content_bytes = content.encode("latin-1")
-                if len(content_bytes) >= 2 and content_bytes[-2:] == b"\\r\\n":
-                    content_bytes = content_bytes[:-2]
-                return content_bytes
+            if 'name="image"' in headers:
+                # Remove trailing CRLF if present
+                if content.endswith(b'\r\n'):
+                    content = content[:-2]
+                return content
 
         return None
     except Exception as error:

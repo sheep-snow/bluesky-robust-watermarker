@@ -69,8 +69,8 @@ import Layout from '../components/Layout.astro';
                                 </label>
                                 <div id="imageInputs" class="space-y-4">
                                     <div class="grid grid-cols-2 gap-4 image-row" data-index="1">
-                                        <input type="file" id="postImage1" accept="image/*" class="file-input file-input-bordered" />
-                                        <textarea id="altText1" rows="2" placeholder="画像1の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>
+                                        <input type="file" id="postImage1" accept="image/*" class="file-input file-input-bordered h-20" />
+                                        <textarea id="altText1" rows="2" placeholder="画像1の説明..." class="textarea textarea-bordered h-20 resize-none" maxlength="2000"></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -229,7 +229,7 @@ import Layout from '../components/Layout.astro';
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + idToken
+                            'Authorization': 'Bearer ' + accessToken
                         },
                         body: JSON.stringify(data)
                     });
@@ -310,7 +310,7 @@ import Layout from '../components/Layout.astro';
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + idToken
+                        'Authorization': 'Bearer ' + accessToken
                     },
                     body: JSON.stringify(postData)
                 });
@@ -336,11 +336,13 @@ import Layout from '../components/Layout.astro';
         });
         
         async function loadUserInfo() {
+            const accessToken = localStorage.getItem('access_token');
+            let response;
             try {
-                const response = await fetch('/api/mypage/info', {
+                response = await fetch('/api/mypage/info', {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Bearer ' + idToken
+                        'Authorization': 'Bearer ' + accessToken
                     }
                 });
                 
@@ -362,9 +364,22 @@ import Layout from '../components/Layout.astro';
                         document.getElementById('blueskySettings').open = true;
                     }
                 } else {
+                    console.log('API response not ok:', response.status, response.statusText);
+                    if (response.status === 401) {
+                        console.log('Authentication failed - redirecting to login');
+                        localStorage.removeItem('access_token');
+                        localStorage.removeItem('id_token');
+                        localStorage.removeItem('refresh_token');
+                        window.location.href = '/login';
+                        return;
+                    }
                     document.getElementById('blueskySettings').open = true;
                 }
             } catch (error) {
+                console.error('Failed to load user info:', error);
+                if (response) {
+                    console.log('Response status:', response.status);
+                }
                 console.log('No existing user info found');
                 document.getElementById('blueskySettings').open = true;
             }
@@ -384,8 +399,8 @@ import Layout from '../components/Layout.astro';
                     newRow.className = 'grid grid-cols-2 gap-4 image-row';
                     newRow.dataset.index = newIndex;
                     newRow.innerHTML = 
-                        '<input type="file" id="postImage' + newIndex + '" accept="image/*" class="file-input file-input-bordered" />' +
-                        '<textarea id="altText' + newIndex + '" rows="2" placeholder="画像' + newIndex + 'の説明..." class="textarea textarea-bordered" maxlength="2000"></textarea>';
+                        '<input type="file" id="postImage' + newIndex + '" accept="image/*" class="file-input file-input-bordered h-20" />' +
+                        '<textarea id="altText' + newIndex + '" rows="2" placeholder="画像' + newIndex + 'の説明..." class="textarea textarea-bordered h-20 resize-none" maxlength="2000"></textarea>';
                     
                     newRow.querySelector('input[type="file"]').addEventListener('change', validateSubmitButton);
                     container.appendChild(newRow);
