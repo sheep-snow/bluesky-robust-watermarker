@@ -101,11 +101,19 @@ Google OAuth 2.0 クライアントの設定手順は以下の通りです。
 
 当アプリは、ユーザーが `Googleでサインイン` した後にアクセスできるマイページ (`/mypage`) から、BlueskyのユーザーID と アプリパスワード の登録を求めます。
 
-アプリは、ユーザーが入力した両情報を使って Bluesky への接続を試み、成功した場合にのみJSON形式で `lib/params-resource-stack.ts` で作成される S3バケット `UserInfoBucket` へ、オブジェクト名 `${Cognito ユーザーの sub}.json` で保存されます。
+アプリは、ユーザーが入力した両情報を使って Bluesky への接続を試み、成功した場合にのみ `lib/database-stack.ts` で作成される DynamoDBテーブル `users` へ、パーティションキー `${Cognito ユーザーの sub}` で保存されます。
+
+**注意**: 以前のバージョンではユーザー情報をS3バケット `UserInfoBucket` に、投稿情報をS3バケットから手動で収集していましたが、現在は両方ともDynamoDBテーブルを使用しています。既存のデータをDynamoDBに移行する場合は、[MIGRATION.md](MIGRATION.md) を参照してください。
 
 **ユーザーコンテンツの管理**
 
-ユーザーがマイページから投稿した画像と投稿メッセージは、Bluesky投稿と来歴証明の目的で、`lib/params-resource-stack.ts` で作成される S3バケット `ProvenanceInfoBucket`, `ProvenancePublicBucket` などへ保存されます。来歴ページはログインしていないユーザーにも来歴証明のため公開されるコンテンツです。
+ユーザーがマイページから投稿した画像と投稿メッセージは、以下のように管理されます：
+
+- **投稿データ**: S3バケットに画像ファイルと投稿メタデータを保存
+- **投稿情報**: `lib/database-stack.ts` で作成される DynamoDBテーブル `posts` に投稿の来歴情報を保存
+- **来歴ページ**: DynamoDBデータから動的に生成し、S3バケット `ProvenancePublicBucket` に保存してCloudFront経由で公開
+
+来歴ページはログインしていないユーザーにも来歴証明のため公開されるコンテンツです。
 
 ### 1. 依存関係のインストール
 

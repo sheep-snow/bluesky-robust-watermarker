@@ -5,7 +5,9 @@
     "build": "tsc",
     "build-css": "tailwindcss -i ./static/tailwind.css -o ./static/tailwind.min.css --minify",
     "prebuild": "npm run build-css",
-    "deploy": "npm run build-css && cdk deploy --all --context stage=dev --require-approval never"
+    "deploy": "npm run build-css && cdk deploy --all --context stage=dev --require-approval never",
+    "migrate-users": "ts-node scripts/migrate-users-to-dynamodb.ts",
+    "migrate-posts": "ts-node scripts/migrate-posts-to-dynamodb.ts"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^0.1.2",
@@ -25,10 +27,12 @@
   "dependencies": {
     "@atproto/api": "^0.13.20",
     "@aws-sdk/client-cognito-identity-provider": "^3.709.0",
+    "@aws-sdk/client-dynamodb": "^3.709.0",
     "@aws-sdk/client-kms": "^3.709.0",
     "@aws-sdk/client-s3": "^3.709.0",
     "@aws-sdk/client-sqs": "^3.709.0",
     "@aws-sdk/client-ssm": "^3.709.0",
+    "@aws-sdk/lib-dynamodb": "^3.709.0",
     "dotenv": "^16.4.7",
     "nanoid": "^5.0.9",
     "sharp": "^0.34.4"

@@ -1,10 +1,14 @@
 import { CloudFrontClient, CreateInvalidationCommand } from '@aws-sdk/client-cloudfront';
-import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { wrapWithLayout } from '../common/ui-framework';
+import { UserDB } from '../common/user-db';
+import { PostDB } from '../common/post-db';
 
 const APP_NAME = process.env.APP_NAME || 'brw';
 const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 const cloudFrontClient = new CloudFrontClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const userDB = new UserDB(process.env.USERS_TABLE_NAME);
+const postDB = new PostDB(process.env.POSTS_TABLE_NAME);
 
 export const handler = async (event: any) => {
   console.log('Update user list handler started, event:', JSON.stringify(event));
@@ -14,59 +18,29 @@ export const handler = async (event: any) => {
   const { postId, userId, provenanceUrl } = eventData;
 
   try {
-    // Get user info
-    const userCommand = new GetObjectCommand({
-      Bucket: process.env.USER_INFO_BUCKET,
-      Key: `${userId}.json`
-    });
-    const userResult = await s3Client.send(userCommand);
-    const userInfo = JSON.parse(await userResult.Body!.transformToString());
-
-    // Get all provenance pages for this user
-    const listCommand = new ListObjectsV2Command({
-      Bucket: process.env.PROVENANCE_PUBLIC_BUCKET,
-      Prefix: 'provenance/',
-      Delimiter: '/'
-    });
-    const listResult = await s3Client.send(listCommand);
-
-    const userPosts = [];
-    if (listResult.CommonPrefixes) {
-      for (const prefix of listResult.CommonPrefixes) {
-        const postIdFromPrefix = prefix.Prefix?.replace('provenance/', '').replace('/', '');
-        if (postIdFromPrefix) {
-          // Check if this post belongs to the current user
-          try {
-            const postDataCommand = new GetObjectCommand({
-              Bucket: process.env.POST_DATA_BUCKET,
-              Key: `${postIdFromPrefix}/post.json`
-            });
-            const postDataResult = await s3Client.send(postDataCommand);
-            const postData = JSON.parse(await postDataResult.Body!.transformToString());
-
-            if (postData.userId === userId) {
-              const hasImages = (postData.imageMetadata && postData.imageMetadata.length > 0) || postData.image;
-              const imageCount = postData.imageMetadata ? postData.imageMetadata.length : (postData.image ? 1 : 0);
-              
-              userPosts.push({
-                postId: postIdFromPrefix,
-                createdAt: postData.createdAt,
-                text: postData.text || '',
-                hasImages: hasImages,
-                imageCount: imageCount,
-                provenanceUrl: `/provenance/${postIdFromPrefix}/`
-              });
-            }
-          } catch (error) {
-            // Skip if post data not found
-            console.log(`Post data not found for ${postIdFromPrefix}`);
-          }
-        }
-      }
+    // Get user info from DynamoDB
+    const userInfo = await userDB.getUserInfo(userId);
+    if (!userInfo) {
+      throw new Error(`User info not found for userId: ${userId}`);
     }
 
-    // Sort posts by creation date (newest first)
-    userPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Get all posts for this user from DynamoDB
+    const userPosts = await postDB.getUserPosts(userId);
+    
+    // Transform posts for display
+    const displayPosts = userPosts.map(post => {
+      const hasImages = post.imageMetadata && post.imageMetadata.length > 0;
+      const imageCount = hasImages ? post.imageMetadata.length : 0;
+      
+      return {
+        postId: post.postId,
+        createdAt: post.createdAt,
+        text: post.text || '',
+        hasImages,
+        imageCount,
+        provenanceUrl: `/provenance/${post.postId}/`
+      };
+    });
 
     // Generate user list page content
     const content = `
@@ -83,7 +57,7 @@ export const handler = async (event: any) => {
         </div>
       </div>
     
-      ${userPosts.length > 0 ? userPosts.map(post => `
+      ${displayPosts.length > 0 ? displayPosts.map(post => `
       <div class="card bg-base-100 shadow-xl mb-6">
         <div class="card-body">
           <h3 class="card-title text-primary">📋 Post ${post.postId}</h3>
@@ -128,7 +102,7 @@ export const handler = async (event: any) => {
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
           </div>
           <div class="stat-title">来歴数</div>
-          <div class="stat-value text-primary">${userPosts.length}</div>
+          <div class="stat-value text-primary">${displayPosts.length}</div>
         </div>
         <div class="stat">
           <div class="stat-figure text-secondary">
@@ -206,7 +180,7 @@ export const handler = async (event: any) => {
       ...eventData,
       userListUrl,
       userListUpdated: true,
-      totalPosts: userPosts.length
+      totalPosts: displayPosts.length
     };
 
   } catch (error) {

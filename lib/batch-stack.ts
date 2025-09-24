@@ -82,6 +82,24 @@ export class BatchStack extends cdk.Stack {
                 'dynamodb:UpdateItem'
               ],
               resources: [props.databaseStack.processingProgressTable.tableArn]
+            }),
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'dynamodb:GetItem'
+              ],
+              resources: [props.databaseStack.usersTable.tableArn]
+            }),
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'dynamodb:PutItem',
+                'dynamodb:Query'
+              ],
+              resources: [
+                props.databaseStack.postsTable.tableArn,
+                `${props.databaseStack.postsTable.tableArn}/index/*`
+              ]
             })
           ]
         }),
@@ -170,7 +188,8 @@ export class BatchStack extends cdk.Stack {
         APP_NAME: props.appName,
         USER_INFO_BUCKET: props.paramsResourceStack.userInfoBucket.bucketName,
         POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
-        STAGE: props.stage
+        STAGE: props.stage,
+        USERS_TABLE_NAME: props.databaseStack.usersTable.tableName
       }
     });
 
@@ -195,7 +214,9 @@ export class BatchStack extends cdk.Stack {
         POST_DATA_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-post-data-bucket-name`),
         PROVENANCE_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`),
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
-        STAGE: props.stage
+        STAGE: props.stage,
+        USERS_TABLE_NAME: props.databaseStack.usersTable.tableName,
+        POSTS_TABLE_NAME: props.databaseStack.postsTable.tableName
       }
     });
 
@@ -221,7 +242,9 @@ export class BatchStack extends cdk.Stack {
         PROVENANCE_BUCKET: cdk.Fn.importValue(`${props.appName}-${props.stage}-provenance-bucket-name`),
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
         CLOUDFRONT_DISTRIBUTION_ID: cdk.Fn.importValue(`${props.appName}-${props.stage}-distribution-id`),
-        STAGE: props.stage
+        STAGE: props.stage,
+        USERS_TABLE_NAME: props.databaseStack.usersTable.tableName,
+        POSTS_TABLE_NAME: props.databaseStack.postsTable.tableName
       }
     });
 

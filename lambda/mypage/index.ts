@@ -6,6 +6,7 @@ const { AtpAgent } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
 const { detectImageFormat, getImageExtension, getContentType } = require('../common/image-utils');
 const { wrapWithLayout } = require('../common/ui-framework');
+const { UserDB } = require('../common/user-db');
 
 // アプリ名を環境変数から取得
 const APP_NAME = process.env.APP_NAME || 'brw';
@@ -25,6 +26,7 @@ const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
 const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
 const sqsClient = new SQSClient({ region: process.env.AWS_REGION });
+const userDB = new UserDB(process.env.USERS_TABLE_NAME);
 
 const { nanoid } = require('nanoid');
 
@@ -142,25 +144,22 @@ async function decryptPassword(encryptedPassword: string, keyId: string) {
 
 async function getUserInfo(userId: string) {
   try {
-    const getCommand = new GetObjectCommand({
-      Bucket: process.env.USER_INFO_BUCKET,
-      Key: `${userId}.json`
-    });
-    const result = await s3Client.send(getCommand);
-    const rawUserInfo = JSON.parse(await result.Body.transformToString());
-    const userInfo = sanitizeUserInput(rawUserInfo);
-    // App Passwordは返さない
-    return {
-      blueskyUserId: userInfo.blueskyUserId,
-      updatedAt: userInfo.updatedAt,
-      validatedAt: userInfo.validatedAt,
-      provenancePageId: userInfo.provenancePageId,
-      createdAt: userInfo.createdAt // 追加
-    };
-  } catch (error: any) {
-    if (error.name === 'NoSuchKey') {
+    const userInfo = await userDB.getUserInfo(userId);
+    if (!userInfo) {
       return null;
     }
+    
+    const sanitizedUserInfo = sanitizeUserInput(userInfo);
+    // App Passwordは返さない
+    return {
+      blueskyUserId: sanitizedUserInfo.blueskyUserId,
+      updatedAt: sanitizedUserInfo.updatedAt,
+      validatedAt: sanitizedUserInfo.validatedAt,
+      provenancePageId: sanitizedUserInfo.provenancePageId,
+      createdAt: sanitizedUserInfo.createdAt
+    };
+  } catch (error: any) {
+    console.error('Error getting user info from DynamoDB:', error);
     throw error;
   }
 }
@@ -1128,29 +1127,18 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
           // Check if user info already exists and merge
           const existingUserInfo = await getUserInfo(userId);
 
+          const isNewUser = !existingUserInfo;
           const userInfo = {
+            userId,
             blueskyUserId: body.blueskyUserId,
             encryptedBlueskyAppPassword: encryptedPassword,
             provenancePageId: existingUserInfo?.provenancePageId || generateUUID(),
             updatedAt: new Date().toISOString(),
             validatedAt: new Date().toISOString(),
-            ...(existingUserInfo && { createdAt: existingUserInfo.createdAt })
+            createdAt: isNewUser ? new Date().toISOString() : existingUserInfo.createdAt
           };
 
-          // Set createdAt if this is a new user
-          const isNewUser = !existingUserInfo;
-          if (isNewUser) {
-            userInfo.createdAt = userInfo.updatedAt;
-          }
-
-          const putCommand = new PutObjectCommand({
-            Bucket: process.env.USER_INFO_BUCKET,
-            Key: `${userId}.json`,
-            Body: JSON.stringify(userInfo),
-            ContentType: 'application/json'
-          });
-
-          await s3Client.send(putCommand);
+          await userDB.saveUserInfo(userInfo);
 
           // Generate empty provenance list for new users
           if (isNewUser) {

@@ -139,6 +139,14 @@ export class MyPageStack extends cdk.Stack {
                 'dynamodb:UpdateItem'
               ],
               resources: [props.databaseStack.processingProgressTable.tableArn]
+            }),
+            new iam.PolicyStatement({
+              effect: iam.Effect.ALLOW,
+              actions: [
+                'dynamodb:GetItem',
+                'dynamodb:PutItem'
+              ],
+              resources: [props.databaseStack.usersTable.tableArn]
             })
           ]
         })
@@ -167,7 +175,8 @@ export class MyPageStack extends cdk.Stack {
         POST_QUEUE_URL: this.postQueue.queueUrl,
         PROVENANCE_PUBLIC_BUCKET: props.paramsResourceStack.provenancePublicBucket.bucketName,
         STAGE: props.stage,
-        PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName
+        PROCESSING_PROGRESS_TABLE_NAME: props.databaseStack.processingProgressTable.tableName,
+        USERS_TABLE_NAME: props.databaseStack.usersTable.tableName
       }
       , retryAttempts: 0
     });

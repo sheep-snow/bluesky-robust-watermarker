@@ -4,6 +4,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { SSMClient } from '@aws-sdk/client-ssm';
 const { AtpAgent, AtUri } = require('@atproto/api');
 const { sanitizeUserInput } = require('../common/sanitize');
+const { UserDB } = require('../common/user-db');
 const sharp = require('sharp');
 
 const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
@@ -37,6 +38,7 @@ const markFailed = async (taskId: string, errorMessage: string, progress: number
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const kmsClient = new KMSClient({ region: process.env.AWS_REGION });
 const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
+const userDB = new UserDB(process.env.USERS_TABLE_NAME);
 
 const APP_NAME = process.env.APP_NAME || 'brw';
 
@@ -160,13 +162,11 @@ export const handler = async (event: any) => {
     const userId = postData.userId;
     console.log('Using userId from post.json:', userId);
 
-    // Get user info
-    const userCommand = new GetObjectCommand({
-      Bucket: process.env.USER_INFO_BUCKET,
-      Key: `${userId}.json`
-    });
-    const userResult = await s3Client.send(userCommand);
-    const rawUserInfo = JSON.parse(await userResult.Body!.transformToString());
+    // Get user info from DynamoDB
+    const rawUserInfo = await userDB.getUserInfo(userId);
+    if (!rawUserInfo) {
+      throw new Error(`User info not found for userId: ${userId}`);
+    }
     const userInfo = sanitizeUserInput(rawUserInfo);
     console.log('User info loaded:', { blueskyUserId: userInfo.blueskyUserId, hasEncryptedPassword: !!userInfo.encryptedBlueskyAppPassword });
 

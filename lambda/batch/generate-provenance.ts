@@ -1,6 +1,8 @@
 import { DynamoDBClient, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { wrapWithLayout } from '../common/ui-framework';
+import { UserDB } from '../common/user-db';
+import { PostDB } from '../common/post-db';
 
 const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
 
@@ -32,6 +34,8 @@ const markFailed = async (taskId: string, errorMessage: string, progress: number
 
 const APP_NAME = process.env.APP_NAME || 'brw';
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
+const userDB = new UserDB(process.env.USERS_TABLE_NAME);
+const postDB = new PostDB(process.env.POSTS_TABLE_NAME);
 
 export const handler = async (event: any) => {
   console.log('Generate provenance handler started, event:', JSON.stringify(event));
@@ -54,13 +58,11 @@ export const handler = async (event: any) => {
     const hasImages = (postData.imageMetadata && postData.imageMetadata.length > 0) || postData.image;
     const imageCount = postData.imageMetadata ? postData.imageMetadata.length : (postData.image ? 1 : 0);
 
-    // Get user info
-    const userCommand = new GetObjectCommand({
-      Bucket: process.env.USER_INFO_BUCKET,
-      Key: `${userId}.json`
-    });
-    const userResult = await s3Client.send(userCommand);
-    const userInfo = JSON.parse(await userResult.Body!.transformToString());
+    // Get user info from DynamoDB
+    const userInfo = await userDB.getUserInfo(userId);
+    if (!userInfo) {
+      throw new Error(`User info not found for userId: ${userId}`);
+    }
 
     // Generate provenance page content
     const content = `
@@ -255,6 +257,22 @@ export const handler = async (event: any) => {
     const provenanceHtml = wrapWithLayout(`${APP_NAME} - Provenance for Post ${postId}`, content, 'provenance');
 
     console.log('Generated provenance page with content labels:', postData.contentLabels || []);
+
+    // Save post info to DynamoDB
+    await updateProgress(postId, 'generating', 85, 'Saving post information');
+    const postInfo = {
+      postId,
+      userId,
+      blueskyUserId: userInfo.blueskyUserId,
+      text: postData.text,
+      imageMetadata: postData.imageMetadata,
+      contentLabels: postData.contentLabels,
+      blueskyPostUri,
+      postedAt,
+      createdAt: postData.createdAt,
+      provenancePageId: userInfo.provenancePageId
+    };
+    await postDB.savePost(postInfo);
 
     // Save provenance page to public bucket
     await updateProgress(postId, 'generating', 90, 'Saving provenance page');
